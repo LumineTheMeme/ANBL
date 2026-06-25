@@ -215,7 +215,15 @@ namespace AmazingNewBoneLogic
             {
                 // return if no accessories are being loaded
                 if (GameObject.Find("cosFileControl")?.GetComponentInChildren<ChaCustom.CustomFileWindow>()
-                        ?.tglCoordeLoadAcs.isOn == false) return;
+                        ?.tglCoordeLoadAcs.isOn == false)
+                {
+                    int cIdx = ChaControl.fileStatus.coordinateType;
+                    if (displayGraph && !graphs.ContainsKey(cIdx))
+                    {
+                        createGraph(cIdx);
+                    }
+                    return;
+                }
             }
 
             int coordIdx = ChaControl.fileStatus.coordinateType;
@@ -488,7 +496,7 @@ namespace AmazingNewBoneLogic
             foreach (SerialisedNode sNode in sGraph.nodes.Where(x => x.type == SerialisedNode.NodeType.Gate_GRP))
                 deserialiseNode(version, outfit, sNode);
             graphData.Add(graphs[outfit], new GraphData(this, newGraph, sGraphData));
-            if (sGraphData == null) graphData[graphs[outfit]].advanced = true;
+            graphData[graphs[outfit]].advanced = _lastModeWasAdvanced;
             newGraph.isLoading = false;
             if (AmazingNewBoneLogic.Debug.Value)
                 AmazingNewBoneLogic.Logger.LogInfo($"Nodes in loaded graph: {newGraph.nodes.Count}");
