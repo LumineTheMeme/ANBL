@@ -1,5 +1,6 @@
 using KKAPI;
 using System;
+using HarmonyLib;
 using LogicFlows;
 using System.Linq;
 using KKAPI.Chara;
@@ -47,6 +48,11 @@ namespace AmazingNewBoneLogic
         internal Dictionary<int, List<BoneEffectEdit>> boneEdits = new Dictionary<int, List<BoneEffectEdit>>();
         internal HashSet<string> activeBoneEditIds = new HashSet<string>();
         private ANBLBoneEffect _boneEffect;
+
+        private Transform hoveredBoneTransform = null;
+        private Transform lastHoveredBoneTransform = null;
+        private static bool _highlightBonesMethodSearched = false;
+        private static System.Reflection.MethodInfo _highlightBonesMethod = null;
 
         internal bool displayGraph = false;
         private bool lastCoordHadANBL = false;
@@ -3273,6 +3279,11 @@ namespace AmazingNewBoneLogic
 
         private void DrawBoneEditorWindow(int windowId)
         {
+            if (Event.current.type == EventType.Layout)
+            {
+                hoveredBoneTransform = null;
+            }
+
             var solidSkin = IMGUIUtils.SolidBackgroundGuiSkin;
             int coord = ChaControl.fileStatus.coordinateType;
             if (!boneEdits.TryGetValue(coord, out var list) || list == null)
@@ -3542,7 +3553,38 @@ namespace AmazingNewBoneLogic
 
             GUILayout.EndHorizontal();
 
+            if (Event.current.type == EventType.Repaint && hoveredBoneTransform != lastHoveredBoneTransform)
+            {
+                UpdateHighlight(hoveredBoneTransform);
+                lastHoveredBoneTransform = hoveredBoneTransform;
+            }
+
             UnityEngine.GUI.DragWindow();
+        }
+
+        private void UpdateHighlight(Transform bone)
+        {
+            if (!_highlightBonesMethodSearched)
+            {
+                _highlightBonesMethodSearched = true;
+                var type = Type.GetType("SliderHighlight.SliderHighlightPlugin, SliderHighlight")
+                        ?? Type.GetType("SliderHighlight.SliderHighlightPlugin, KKS_SliderHighlight")
+                        ?? Type.GetType("SliderHighlight.SliderHighlightPlugin, KK_SliderHighlight");
+                if (type != null)
+                {
+                    _highlightBonesMethod = AccessTools.Method(type, "HighlightBones");
+                }
+            }
+
+            if (_highlightBonesMethod != null)
+            {
+                StopAllCoroutines();
+                StartCoroutine(KKAPI.Utilities.CoroutineUtils.CreateCoroutine(new WaitForFixedUpdate(), () =>
+                {
+                    var hoveredBones = bone != null ? bone.GetComponentsInChildren<Transform>() : null;
+                    _highlightBonesMethod.Invoke(null, new object[] { hoveredBones });
+                }));
+            }
         }
 
         private float stepSizeScale = 0.01f;
@@ -3700,6 +3742,10 @@ namespace AmazingNewBoneLogic
             {
                 selectedBoneTransform = go.transform;
                 selectedBoneEdit = null;
+            }
+            if (Event.current.type == EventType.Repaint && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            {
+                hoveredBoneTransform = go.transform;
             }
             GUI.color = Color.white;
             

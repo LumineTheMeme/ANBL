@@ -23,6 +23,7 @@ namespace AmazingNewBoneLogic
     [BepInPlugin(GUID, PluginName, Version)]
     [BepInDependency(KoikatuAPI.GUID, KoikatuAPI.VersionConst)]
     [BepInDependency("KKABMX.Core")]
+    [BepInDependency("SliderHighlight", BepInDependency.DependencyFlags.SoftDependency)]
     class AmazingNewBoneLogic : BaseUnityPlugin
     {
         public const string PluginName = "AmazingNewBoneLogic";
