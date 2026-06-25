@@ -1,15 +1,15 @@
-﻿using LogicFlows;
+using LogicFlows;
 using UnityEngine;
 using System.Linq;
 using System.Collections.Generic;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     public class LogicFlowNode_GRP : LogicFlowGate
     {
         public static LogicFlowNode requestor = null;
 
-        internal readonly AnalCharaController ctrl;
+        internal readonly AnblCharaController ctrl;
 
         private int _state = 0;
 
@@ -29,7 +29,7 @@ namespace AmazingNewAccessoryLogic
         // dic<state, set<enabledThingForThisState>>
         internal Dictionary<int, HashSet<int>> controlledNodes = new Dictionary<int, HashSet<int>>();
 
-        public LogicFlowNode_GRP(AnalCharaController controller, LogicFlowGraph parentGraph, int? key = null,
+        public LogicFlowNode_GRP(AnblCharaController controller, LogicFlowGraph parentGraph, int? key = null,
             string name = null) : base(new int?[1], parentGraph, key)
         {
             ctrl = controller;

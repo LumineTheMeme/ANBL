@@ -1,4 +1,4 @@
-﻿using LogicFlows;
+using LogicFlows;
 using MessagePack;
 using System.Linq;
 using UnityEngine;
@@ -6,12 +6,12 @@ using System.Collections;
 using Illusion.Extensions;
 using System.Collections.Generic;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     public class GraphData
     {
         public readonly LogicFlowGraph graph;
-        internal readonly AnalCharaController ctrl;
+        internal readonly AnblCharaController ctrl;
 
         private bool _advanced = false;
 
@@ -82,7 +82,7 @@ namespace AmazingNewAccessoryLogic
 
         private bool makeRunning = false;
 
-        public GraphData(AnalCharaController controller, LogicFlowGraph logicGraph, SerialisedGraphData sGD = null)
+        public GraphData(AnblCharaController controller, LogicFlowGraph logicGraph, SerialisedGraphData sGD = null)
         {
             graph = logicGraph;
             ctrl = controller;
@@ -283,8 +283,8 @@ namespace AmazingNewAccessoryLogic
 
         public static void CopyAccData(int srcSlot, GraphData srcData, int dstSlot = -1, GraphData dstData = null)
         {
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo("Copying accessory data...");
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo("Copying bone data...");
             if (dstData == null && dstSlot == -1) return;
             if (dstData == null) dstData = srcData;
             if (dstSlot == -1) dstSlot = srcSlot;
@@ -320,7 +320,7 @@ namespace AmazingNewAccessoryLogic
             if (!makeRunning)
             {
                 makeRunning = true;
-                AmazingNewAccessoryLogic.Instance.StartCoroutine(DoMakeGraph());
+                AmazingNewBoneLogic.Instance.StartCoroutine(DoMakeGraph());
             }
 
             IEnumerator DoMakeGraph()
@@ -375,7 +375,7 @@ namespace AmazingNewAccessoryLogic
                     else if (node is LogicFlowNode_GRP)
                     {
                         node.inputs[0] = null;
-                        node.setPosition(AnalCharaController.defaultGraphSize / 2 - node.getSize() / 2);
+                        node.setPosition(AnblCharaController.defaultGraphSize / 2 - node.getSize() / 2);
                     }
                 }
             }
@@ -584,8 +584,8 @@ namespace AmazingNewAccessoryLogic
             int outfit = ctrl.graphs.FirstOrDefault(x => x.Value == graph).Key;
 
             // Get all node indices whose outputs are being used
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo("Analysing dependencies...");
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo("Analysing dependencies...");
             HashSet<int> allSources = new HashSet<int>();
             foreach (var node in graph.nodes.Values)
             {
@@ -596,8 +596,8 @@ namespace AmazingNewAccessoryLogic
             }
 
             // Remove any unconnected nodes
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo("Removing unconnected nodes...");
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo("Removing unconnected nodes...");
             HashSet<int> toRemove = new HashSet<int>();
             foreach (var node in graph.nodes.Values)
             {
@@ -631,7 +631,7 @@ namespace AmazingNewAccessoryLogic
                 graph.RemoveNode(idx);
 
             // Prettify layout
-            if (AmazingNewAccessoryLogic.Debug.Value) AmazingNewAccessoryLogic.Logger.LogInfo("Arranging nodes...");
+            if (AmazingNewBoneLogic.Debug.Value) AmazingNewBoneLogic.Logger.LogInfo("Arranging nodes...");
             int numOutputs = 0;
             float perNodeOffset = 35f;
             var allChildren = GetAllChildIndices();
@@ -642,14 +642,14 @@ namespace AmazingNewAccessoryLogic
                 {
                     numOutputs++;
                     var output = ctrl.getOutput(child, outfit);
-                    output.setPosition(AnalCharaController.OutputPos(numOutputs));
+                    output.setPosition(AnblCharaController.OutputPos(numOutputs));
                 }
 
                 var grp = graph.getNodeAt(kvp.Key);
                 if (kvp.Value.Count > 0)
                 {
                     float newY = ctrl.getOutput(kvp.Value[0], outfit).getPosition().y;
-                    float newX = AnalCharaController.defaultGraphSize.x - 80f - perNodeOffset - grp.getSize().x;
+                    float newX = AnblCharaController.defaultGraphSize.x - 80f - perNodeOffset - grp.getSize().x;
                     grp.setPosition(new Vector2(newX, newY));
                 }
 
@@ -664,17 +664,17 @@ namespace AmazingNewAccessoryLogic
                     numOutputs++;
                     var output = ctrl.getOutput(slot.Key - 1000000, outfit);
                     if (output == null) continue;
-                    output.setPosition(AnalCharaController.OutputPos(numOutputs));
+                    output.setPosition(AnblCharaController.OutputPos(numOutputs));
                     SetChainPos(output);
                 }
             }
 
             // Set graph size to encompass all outputs
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo("Adjusting graph size...");
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo("Adjusting graph size...");
             graph.setSize(new Vector2(
-                AnalCharaController.defaultGraphSize.x + AnalCharaController.OutputCol(numOutputs) * 100f,
-                AnalCharaController.defaultGraphSize.y
+                AnblCharaController.defaultGraphSize.x + AnblCharaController.OutputCol(numOutputs) * 100f,
+                AnblCharaController.defaultGraphSize.y
             ));
 
             // Helper function
@@ -682,9 +682,9 @@ namespace AmazingNewAccessoryLogic
             {
                 if (root == null) return;
                 Vector2 previous = root.getPosition();
-                if (previous.x > AnalCharaController.defaultGraphSize.x - 80f)
+                if (previous.x > AnblCharaController.defaultGraphSize.x - 80f)
                 {
-                    previous.x = AnalCharaController.defaultGraphSize.x - 80f;
+                    previous.x = AnblCharaController.defaultGraphSize.x - 80f;
                 }
 
                 List<LogicFlowNode> toCheck = new List<LogicFlowNode> { root.inputAt(0) };

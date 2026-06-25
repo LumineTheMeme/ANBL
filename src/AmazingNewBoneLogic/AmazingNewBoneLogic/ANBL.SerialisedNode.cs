@@ -1,10 +1,10 @@
-﻿using LogicFlows;
+using LogicFlows;
 using MessagePack;
 using UnityEngine;
 using System.Linq;
 using System.Collections.Generic;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     [MessagePackObject]
     public class SerialisedNode
@@ -55,7 +55,7 @@ namespace AmazingNewAccessoryLogic
         public static SerialisedNode fromInput(LogicFlowInput input, LogicFlowGraph graph)
         {
             SerialisedNode sn = new SerialisedNode();
-            if (AnalCharaController.serialisationData.TryGetValue(graph, out var dicGraph) &&
+            if (AnblCharaController.serialisationData.TryGetValue(graph, out var dicGraph) &&
                 dicGraph.TryGetValue(input.index, out var sData))
             {
                 sn.data2 = sData;

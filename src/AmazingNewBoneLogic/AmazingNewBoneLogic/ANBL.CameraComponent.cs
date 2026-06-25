@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using BepInEx;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
-    class AnalCameraComponent : MonoBehaviour
+    class AnblCameraComponent : MonoBehaviour
     {
         public EventHandler<CameraEventArgs> OnPostRenderEvent;
 

@@ -1,11 +1,54 @@
-src/AmazingNewAccessoryLogic/packages
-src/AmazingNewAccessoryLogic/KK_AmazingNewAccessoryLogic/bin
-src/AmazingNewAccessoryLogic/KK_AmazingNewAccessoryLogic/obj
-src/AmazingNewAccessoryLogic/KKS_AmazingNewAccessoryLogic/bin
-src/AmazingNewAccessoryLogic/KKS_AmazingNewAccessoryLogic/obj
-src/AmazingNewAccessoryLogic/AmazingNewAccessoryLogic/bin
-src/AmazingNewAccessoryLogic/AmazingNewAccessoryLogic/obj
-.vscode
-.vs
-.DS_Store
-.idea
+## Target directory tool settings (e.g. Visual Studio)
+.vs/
+_ReSharper*/
+*.ToolsForMSBuild
+*.user
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Xx]64/
+[Xx]82/
+[Aa]rm/
+[Aa]rm64/
+bbin/
+bin/
+obj/
+x64/
+x86/
+target/
+
+## Roslyn cache directories
+*.ide/
+
+## MSTest test results
+TestResults/
+[Bb]uild[Ll]og.*
+
+## Package folders
+*.nupkg
+# NuGet Packages
+packages/
+# Paket dependency manager
+.paket/
+
+## Visual Studio Launch Profiles
+linterArgs.json
+
+## Just-In-Time Debugger logs
+*.dhd
+
+## Diagnostic Report folders
+*.diagsessions
+
+## Windows temporary files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+## Crash dumps
+*.dmp
+*.mdmp

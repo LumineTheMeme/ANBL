@@ -1,15 +1,15 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // Allgemeine Informationen über eine Assembly werden über die folgenden
 // Attribute gesteuert. Ändern Sie diese Attributwerte, um die Informationen zu ändern,
 // die einer Assembly zugeordnet sind.
-[assembly: AssemblyTitle("KKS_AmazingNewAccessoryLogic")]
+[assembly: AssemblyTitle("KK_AmazingNewBoneLogic")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("KKS_AmazingNewAccessoryLogic")]
+[assembly: AssemblyProduct("KK_AmazingNewBoneLogic")]
 [assembly: AssemblyCopyright("Copyright ©  2023")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // Die folgende GUID bestimmt die ID der Typbibliothek, wenn dieses Projekt für COM verfügbar gemacht wird
-[assembly: Guid("e5567bb7-6933-4946-bc66-84dc0c35df73")]
+[assembly: Guid("c6e31b9c-7450-4239-b0a3-aff33c604022")]
 
 // Versionsinformationen für eine Assembly bestehen aus den folgenden vier Werten:
 //

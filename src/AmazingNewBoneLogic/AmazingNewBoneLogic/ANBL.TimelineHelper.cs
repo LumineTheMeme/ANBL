@@ -1,9 +1,9 @@
-﻿using Studio;
+using Studio;
 using System.Xml;
 using System.Linq;
 using KKAPI.Utilities;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     internal class TimelineHelper
     {
@@ -15,7 +15,7 @@ namespace AmazingNewAccessoryLogic
 
             // Group state
             TimelineCompatibility.AddInterpolableModelDynamic(
-                owner: "ANAL",
+                owner: "ANBL",
                 id: "groupState",
                 name: "Group State",
                 interpolateBefore: (oci, parameter, leftValue, rightValue, factor) =>
@@ -39,7 +39,7 @@ namespace AmazingNewAccessoryLogic
         private static LogicFlowNode_GRP GetGroup(ObjectCtrlInfo oci, GroupParam parameter)
         {
             if (oci == null || parameter == null || !(oci is OCIChar ociChar)) return null;
-            var ctrl = ociChar.charInfo.GetComponent<AnalCharaController>();
+            var ctrl = ociChar.charInfo.GetComponent<AnblCharaController>();
             if (ctrl == null || !ctrl.graphs.TryGetValue(parameter.outfit, out var lfg)) return null;
             var node = lfg.nodes.Values.FirstOrDefault(n => n.index == parameter.index);
             return node is LogicFlowNode_GRP grp ? grp : null;

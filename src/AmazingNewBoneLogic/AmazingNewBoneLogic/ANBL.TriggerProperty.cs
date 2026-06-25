@@ -1,6 +1,6 @@
-﻿using MessagePack;
+using MessagePack;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     [MessagePackObject]
     public class TriggerProperty

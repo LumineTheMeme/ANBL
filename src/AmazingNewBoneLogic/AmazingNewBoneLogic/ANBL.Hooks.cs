@@ -1,9 +1,9 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using LogicFlows;
 using System.Collections;
 using UnityEngine;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     public static class Hooks
     {
@@ -76,14 +76,14 @@ namespace AmazingNewAccessoryLogic
         {
             if (KKAPI.Maker.MakerAPI.InsideMaker && type == 0)
             {
-                __instance.GetComponent<AnalCharaController>().AccessoryKindChanged(slotNo, true);
+                __instance.GetComponent<AnblCharaController>().AccessoryKindChanged(slotNo, true);
             }
         }
         
         [HarmonyPrefix, HarmonyPatch(typeof(ChaControl), nameof(ChaControl.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         private static void ChangeCoordinateTypePrefix(ChaControl __instance)
         {
-            AnalCharaController c = __instance.GetComponent<AnalCharaController>();
+            AnblCharaController c = __instance.GetComponent<AnblCharaController>();
             if (c)
             {
                 c.OutfitChanged();

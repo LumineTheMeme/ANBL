@@ -1,9 +1,9 @@
-﻿using LogicFlows;
+using LogicFlows;
 using MessagePack;
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
     [MessagePackObject]
     public class SerialisedGraph

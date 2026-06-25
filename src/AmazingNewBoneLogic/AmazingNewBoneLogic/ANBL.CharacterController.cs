@@ -1,4 +1,4 @@
-﻿using KKAPI;
+using KKAPI;
 using System;
 using LogicFlows;
 using System.Linq;
@@ -11,10 +11,11 @@ using System.Collections;
 using ExtensibleSaveFormat;
 using System.Collections.Generic;
 using KKAPI.Utilities;
+using KKABMX.Core;
 
-namespace AmazingNewAccessoryLogic
+namespace AmazingNewBoneLogic
 {
-    public class AnalCharaController : CharaCustomFunctionController
+    public class AnblCharaController : CharaCustomFunctionController
     {
         public const int normalInputWindowID = 2233500;
         public const int advancedInputWindowID = 2233511;
@@ -24,6 +25,8 @@ namespace AmazingNewAccessoryLogic
         public const int simpleModeAccBindDropID = 2233555;
         public const int simpleModeGroupAddID = 2233566;
         public const int confirmWindowID = 2233577;
+        public const int boneEditorWindowID = 2233588;
+        public const int transferPopupID = 2233599;
 
         public static readonly Vector2 defaultGraphSize = new Vector2(600, 900);
         public static readonly byte saveVersion = 2;
@@ -41,9 +44,12 @@ namespace AmazingNewAccessoryLogic
 
         private Dictionary<LogicFlowGraph, GraphData> graphData = new Dictionary<LogicFlowGraph, GraphData>();
         internal Dictionary<int, LogicFlowGraph> graphs = new Dictionary<int, LogicFlowGraph>();
+        internal Dictionary<int, List<BoneEffectEdit>> boneEdits = new Dictionary<int, List<BoneEffectEdit>>();
+        internal HashSet<string> activeBoneEditIds = new HashSet<string>();
+        private ANBLBoneEffect _boneEffect;
 
         internal bool displayGraph = false;
-        private bool lastCoordHadANAL = false;
+        private bool lastCoordHadANBL = false;
         private static Material mat = new Material(Shader.Find("Hidden/Internal-Colored"));
 
         public PluginData loadedCardData = null;
@@ -58,19 +64,28 @@ namespace AmazingNewAccessoryLogic
 
         protected override void OnCardBeingSaved(GameMode currentGameMode)
         {
-            if (graphs.Count == 0) return;
+            if (graphs.Count == 0 && boneEdits.Count == 0) return;
             PluginData data = new PluginData();
-            Dictionary<int, SerialisedGraph> sCharaGraphs = new Dictionary<int, SerialisedGraph>();
-            Dictionary<int, SerialisedGraphData> sCharaGraphData = new Dictionary<int, SerialisedGraphData>();
-            foreach (int outfit in graphs.Keys)
+            if (graphs.Count > 0)
             {
-                if (graphs[outfit].getAllNodes().Count == Enum.GetNames(typeof(InputKey)).Length) continue;
-                sCharaGraphs.Add(outfit, SerialisedGraph.Serialise(graphs[outfit]));
-                sCharaGraphData.Add(outfit, SerialisedGraphData.Serialise(outfit, graphData[graphs[outfit]]));
+                Dictionary<int, SerialisedGraph> sCharaGraphs = new Dictionary<int, SerialisedGraph>();
+                Dictionary<int, SerialisedGraphData> sCharaGraphData = new Dictionary<int, SerialisedGraphData>();
+                foreach (int outfit in graphs.Keys)
+                {
+                    if (graphs[outfit].getAllNodes().Count == Enum.GetNames(typeof(InputKey)).Length) continue;
+                    sCharaGraphs.Add(outfit, SerialisedGraph.Serialise(graphs[outfit]));
+                    sCharaGraphData.Add(outfit, SerialisedGraphData.Serialise(outfit, graphData[graphs[outfit]]));
+                }
+
+                data.data.Add("Graphs", MessagePackSerializer.Serialize(sCharaGraphs));
+                data.data.Add("GraphData", MessagePackSerializer.Serialize(sCharaGraphData));
             }
 
-            data.data.Add("Graphs", MessagePackSerializer.Serialize(sCharaGraphs));
-            data.data.Add("GraphData", MessagePackSerializer.Serialize(sCharaGraphData));
+            if (boneEdits.Count > 0)
+            {
+                data.data.Add("BoneEdits", MessagePackSerializer.Serialize(boneEdits));
+            }
+
             data.data.Add("Version", saveVersion);
             SetExtendedData(data);
         }
@@ -79,6 +94,9 @@ namespace AmazingNewAccessoryLogic
         {
             graphData.Clear();
             graphs.Clear();
+            boneEdits.Clear();
+            activeBoneEditIds.Clear();
+            EnsureBoneEffectRegistered();
 
             PluginData data = maintainState ? loadedCardData : GetExtendedData();
             if (data == null)
@@ -113,7 +131,7 @@ namespace AmazingNewAccessoryLogic
                     {
                         deserialiseGraph(version, outfit, sGraphs[outfit],
                             sGraphData != null ? sGraphData[outfit] : null);
-                        AmazingNewAccessoryLogic.Logger.LogDebug($"Loaded Logic Graph for outfit {outfit}");
+                        AmazingNewBoneLogic.Logger.LogDebug($"Loaded Logic Graph for outfit {outfit}");
                     }
 
                     StartCoroutine(UpdateLater());
@@ -125,9 +143,20 @@ namespace AmazingNewAccessoryLogic
                         lfg?.ForceUpdate();
                     }
                 }
+
+                if (data.data.TryGetValue("BoneEdits", out var boneEditsSerialised) && boneEditsSerialised != null)
+                {
+                    boneEdits = MessagePackSerializer.Deserialize<Dictionary<int, List<BoneEffectEdit>>>((byte[])boneEditsSerialised);
+                }
+            }
+
+            var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+            if (boneController != null)
+            {
+                boneController.NeedsFullRefresh = true;
             }
             
-            AmazingNewAccessoryLogic.UpdateMakerButtonVisibility();
+            AmazingNewBoneLogic.UpdateMakerButtonVisibility();
 
             base.OnReload(currentGameMode, maintainState);
         }
@@ -138,11 +167,23 @@ namespace AmazingNewAccessoryLogic
 
             PluginData data = new PluginData();
             int coord = ChaControl.fileStatus.coordinateType;
-            if (!graphs.ContainsKey(coord)) return;
-            SerialisedGraph sGraph = SerialisedGraph.Serialise(graphs[coord]);
-            SerialisedGraphData sGraphData = SerialisedGraphData.Serialise(coord, graphData[graphs[coord]]);
-            data.data.Add("Graph", MessagePackSerializer.Serialize(sGraph));
-            data.data.Add("GraphData", MessagePackSerializer.Serialize(sGraphData));
+            bool hasGraph = graphs.ContainsKey(coord);
+            bool hasBoneEdits = boneEdits.ContainsKey(coord) && boneEdits[coord].Count > 0;
+            if (!hasGraph && !hasBoneEdits) return;
+
+            if (hasGraph)
+            {
+                SerialisedGraph sGraph = SerialisedGraph.Serialise(graphs[coord]);
+                SerialisedGraphData sGraphData = SerialisedGraphData.Serialise(coord, graphData[graphs[coord]]);
+                data.data.Add("Graph", MessagePackSerializer.Serialize(sGraph));
+                data.data.Add("GraphData", MessagePackSerializer.Serialize(sGraphData));
+            }
+
+            if (hasBoneEdits)
+            {
+                data.data.Add("BoneEdits", MessagePackSerializer.Serialize(boneEdits[coord]));
+            }
+
             data.data.Add("Version", saveVersion);
             SetCoordinateExtendedData(coordinate, data);
         }
@@ -164,6 +205,12 @@ namespace AmazingNewAccessoryLogic
                 graphData.Remove(graphs[coordIdx]);
                 graphs.Remove(coordIdx);
             }
+            if (boneEdits.ContainsKey(coordIdx))
+            {
+                boneEdits.Remove(coordIdx);
+            }
+            activeBoneEditIds.Clear();
+            EnsureBoneEffectRegistered();
 
             PluginData data = maintainState ? loadedCoordData : GetCoordinateExtendedData(coordinate);
             if (data == null)
@@ -195,7 +242,7 @@ namespace AmazingNewAccessoryLogic
                     if (sGraph != null)
                     {
                         deserialiseGraph(version, coordIdx, sGraph, sGraphData);
-                        AmazingNewAccessoryLogic.Logger.LogDebug($"Loaded Logic Graph for outfit {coordIdx}");
+                        AmazingNewBoneLogic.Logger.LogDebug($"Loaded Logic Graph for outfit {coordIdx}");
                     }
 
                     StartCoroutine(UpdateLater());
@@ -207,15 +254,26 @@ namespace AmazingNewAccessoryLogic
                         lfg?.ForceUpdate();
                     }
                 }
+
+                if (data.data.TryGetValue("BoneEdits", out var coordBoneEditsSerialised) && coordBoneEditsSerialised != null)
+                {
+                    boneEdits[coordIdx] = MessagePackSerializer.Deserialize<List<BoneEffectEdit>>((byte[])coordBoneEditsSerialised);
+                }
             }
 
-            AmazingNewAccessoryLogic.UpdateMakerButtonVisibility();
+            var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+            if (boneController != null)
+            {
+                boneController.NeedsFullRefresh = true;
+            }
+
+            AmazingNewBoneLogic.UpdateMakerButtonVisibility();
         }
 
         internal void AccessoryTransferred(int sourceSlot, int destinationSlot)
         {
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo(
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo(
                     $"Transfering acc {sourceSlot + 1} to {destinationSlot + 1}...");
 
             // Check if there's anything to do
@@ -227,8 +285,8 @@ namespace AmazingNewAccessoryLogic
             var data = graphData[lfg];
             if (destNode != null)
             {
-                if (AmazingNewAccessoryLogic.Debug.Value)
-                    AmazingNewAccessoryLogic.Logger.LogInfo($"Removing old data...");
+                if (AmazingNewBoneLogic.Debug.Value)
+                    AmazingNewBoneLogic.Logger.LogInfo($"Removing old data...");
                 data.PurgeNode(destNode);
                 lfg.RemoveNode(destNode.index);
             }
@@ -237,11 +295,11 @@ namespace AmazingNewAccessoryLogic
             LogicFlowOutput sourceNode = getOutput(sourceSlot);
             if (sourceNode != null)
             {
-                if (AmazingNewAccessoryLogic.Debug.Value)
-                    AmazingNewAccessoryLogic.Logger.LogInfo($"Copying new data...");
+                if (AmazingNewBoneLogic.Debug.Value)
+                    AmazingNewBoneLogic.Logger.LogInfo($"Copying new data...");
                 destNode = addOutput(destinationSlot, outfit);
-                if (AmazingNewAccessoryLogic.Debug.Value && destNode == null)
-                    AmazingNewAccessoryLogic.Logger.LogInfo($"Could not create new output!");
+                if (AmazingNewBoneLogic.Debug.Value && destNode == null)
+                    AmazingNewBoneLogic.Logger.LogInfo($"Could not create new output!");
                 if (sourceNode.inputAt(0) != null)
                 {
                     destNode.SetInput(sourceNode.inputAt(0).index, 0);
@@ -255,11 +313,11 @@ namespace AmazingNewAccessoryLogic
         {
             if (lfg == null) return;
 
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo($"Acc in slot {slot + 1} changed kind!");
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo($"Acc in slot {slot + 1} changed kind!");
             if (forceRemove || ChaControl.objAccessory[slot] == null)
             {
-                if (AmazingNewAccessoryLogic.Debug.Value) AmazingNewAccessoryLogic.Logger.LogInfo($"Removing...");
+                if (AmazingNewBoneLogic.Debug.Value) AmazingNewBoneLogic.Logger.LogInfo($"Removing...");
                 int outfit = ChaControl.fileStatus.coordinateType;
                 graphData[lfg].PurgeNode(getOutput(slot));
                 lfg.RemoveNode(slot + 1000000);
@@ -277,8 +335,8 @@ namespace AmazingNewAccessoryLogic
                 createGraph(destinationOutfit);
             }
 
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo(
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo(
                     $"Copying acc from outfit {sourceOutfit} to {destinationOutfit}...");
 
             // Create variables
@@ -296,16 +354,16 @@ namespace AmazingNewAccessoryLogic
                 // Destroy any existing data on the destination outfit for this slot
                 if (dstGraph.getNodeAt(idxSlot) != null)
                 {
-                    if (AmazingNewAccessoryLogic.Debug.Value)
-                        AmazingNewAccessoryLogic.Logger.LogInfo($"Removing old data...");
+                    if (AmazingNewBoneLogic.Debug.Value)
+                        AmazingNewBoneLogic.Logger.LogInfo($"Removing old data...");
                     dstData.PurgeNode(dstGraph.getNodeAt(idxSlot));
                     dstGraph.RemoveNode(idxSlot);
                 }
 
                 // Copy over data if it exists
                 if (srcGraph == null || srcGraph.getNodeAt(idxSlot) == null) continue;
-                if (AmazingNewAccessoryLogic.Debug.Value)
-                    AmazingNewAccessoryLogic.Logger.LogInfo($"Copying new data...");
+                if (AmazingNewBoneLogic.Debug.Value)
+                    AmazingNewBoneLogic.Logger.LogInfo($"Copying new data...");
                 LogicFlowOutput sOutput = (LogicFlowOutput)srcGraph.getNodeAt(idxSlot);
                 if (sOutput == null) continue;
                 List<int> iTree = sOutput.getInputTree();
@@ -353,24 +411,27 @@ namespace AmazingNewAccessoryLogic
 
         public void OutfitChanged()
         {
-            AmazingNewAccessoryLogic.Logger.LogDebug("Coordinate changed, applying data...");
+            AmazingNewBoneLogic.Logger.LogDebug("Coordinate changed, applying data...");
+            activeBoneEditIds.Clear();
+            EnsureBoneEffectRegistered();
             StartCoroutine(UpdateLater());
         }
         
         private IEnumerator UpdateLater()
         {
             for (int i = 0; i < 2; i++) yield return null;
-            if (lastCoordHadANAL && !StudioAPI.InsideStudio)
+            if (lastCoordHadANBL)
             {
-                if (AmazingNewAccessoryLogic.Debug.Value)
-                    AmazingNewAccessoryLogic.Logger.LogInfo("Resetting accessories!");
-                lastCoordHadANAL = false;
-                for (int i = 0; i < ChaControl.infoAccessory.Length; i++)
-                    if (ChaControl.infoAccessory[i] != null)
-                        setAccessoryState(i, true);
+                lastCoordHadANBL = false;
+                activeBoneEditIds.Clear();
+                var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                if (boneController != null)
+                {
+                    boneController.NeedsFullRefresh = true;
+                }
             }
             lfg?.ForceUpdate();
-            AmazingNewAccessoryLogic.UpdateMakerButtonVisibility();
+            AmazingNewBoneLogic.UpdateMakerButtonVisibility();
         }
         
         #endregion
@@ -390,15 +451,15 @@ namespace AmazingNewAccessoryLogic
             graphData.Add(graphs[outfit], new GraphData(this, newGraph, sGraphData));
             if (sGraphData == null) graphData[graphs[outfit]].advanced = true;
             newGraph.isLoading = false;
-            if (AmazingNewAccessoryLogic.Debug.Value)
-                AmazingNewAccessoryLogic.Logger.LogInfo($"Nodes in loaded graph: {newGraph.nodes.Count}");
+            if (AmazingNewBoneLogic.Debug.Value)
+                AmazingNewBoneLogic.Logger.LogInfo($"Nodes in loaded graph: {newGraph.nodes.Count}");
         }
 
         private void deserialiseNode(int version, int outfit, SerialisedNode sNode)
         {
-            if (AmazingNewAccessoryLogic.Debug.Value)
+            if (AmazingNewBoneLogic.Debug.Value)
             {
-                AmazingNewAccessoryLogic.Logger.LogInfo(
+                AmazingNewBoneLogic.Logger.LogInfo(
                     $"Deserialising node: Outfit {outfit}, {sNode.type}, {sNode.name}, {sNode.index}");
             }
             lastSNode = sNode;
@@ -467,7 +528,7 @@ namespace AmazingNewAccessoryLogic
                     else
                     {
                         node = addOutput(sNode.index - 1000000, outfit, sNode.name);
-                        if (node == null) AmazingNewAccessoryLogic.Logger.
+                        if (node == null) AmazingNewBoneLogic.Logger.
                                 LogMessage($"No output could be added for outfit {outfit}, slot {sNode.index - 999999}!");
                         if (sNode.data?.Count > 0) StartCoroutine(SetInputLater(sNode.index, outfit, sNode.data[0]));
                     }
@@ -534,7 +595,7 @@ namespace AmazingNewAccessoryLogic
         private LogicFlowGraph getCurrentGraph()
         {
             if (!graphs.ContainsKey(ChaControl.fileStatus.coordinateType)) return null;
-            lastCoordHadANAL = true;
+            lastCoordHadANBL = true;
             return graphs[ChaControl.fileStatus.coordinateType];
         }
 
@@ -555,10 +616,10 @@ namespace AmazingNewAccessoryLogic
         {
             graphs.Values.ToList().ForEach(graph =>
             {
-                graph.KeyNodeDelete = AmazingNewAccessoryLogic.UIDeleteNodeKey.Value;
-                graph.KeyNodeDisable = AmazingNewAccessoryLogic.UIDisableNodeKey.Value;
-                graph.KeySelectTree = AmazingNewAccessoryLogic.UISelectedTreeKey.Value;
-                graph.KeySelectNetwork = AmazingNewAccessoryLogic.UISelectNetworkKey.Value;
+                graph.KeyNodeDelete = AmazingNewBoneLogic.UIDeleteNodeKey.Value;
+                graph.KeyNodeDisable = AmazingNewBoneLogic.UIDisableNodeKey.Value;
+                graph.KeySelectTree = AmazingNewBoneLogic.UISelectedTreeKey.Value;
+                graph.KeySelectNetwork = AmazingNewBoneLogic.UISelectNetworkKey.Value;
             });
         }
 
@@ -571,10 +632,10 @@ namespace AmazingNewAccessoryLogic
             graphs[outfit.Value] = new LogicFlowGraph(new Rect(new Vector2(100, 10), defaultGraphSize));
 
             // set input keycodes
-            graphs[outfit.Value].KeyNodeDelete = AmazingNewAccessoryLogic.UIDeleteNodeKey.Value;
-            graphs[outfit.Value].KeyNodeDisable = AmazingNewAccessoryLogic.UIDisableNodeKey.Value;
-            graphs[outfit.Value].KeySelectTree = AmazingNewAccessoryLogic.UISelectedTreeKey.Value;
-            graphs[outfit.Value].KeySelectNetwork = AmazingNewAccessoryLogic.UISelectNetworkKey.Value;
+            graphs[outfit.Value].KeyNodeDelete = AmazingNewBoneLogic.UIDeleteNodeKey.Value;
+            graphs[outfit.Value].KeyNodeDisable = AmazingNewBoneLogic.UIDisableNodeKey.Value;
+            graphs[outfit.Value].KeySelectTree = AmazingNewBoneLogic.UISelectedTreeKey.Value;
+            graphs[outfit.Value].KeySelectNetwork = AmazingNewBoneLogic.UISelectNetworkKey.Value;
 
             // create simple mode data
             graphData[graphs[outfit.Value]] = new GraphData(this, graphs[outfit.Value]);
@@ -1117,7 +1178,7 @@ namespace AmazingNewAccessoryLogic
                     graph.setSize(new Vector2(output.getPosition().x + 80f, graph.getSize().y));
 
                 output.nodeDeletedEvent += (object sender, NodeDeletedEventArgs e) =>
-                    AmazingNewAccessoryLogic.Logger.LogInfo($"Removed Slot {slot} on outfit {outfit.Value}");
+                    AmazingNewBoneLogic.Logger.LogInfo($"Removed Slot {slot} on outfit {outfit.Value}");
                 return output;
             }
 
@@ -1198,19 +1259,26 @@ namespace AmazingNewAccessoryLogic
         }
 #endif
 
-        public void setAccessoryState(int accessorySlot, bool stateValue)
+        public void setAccessoryState(int graphKey, bool stateValue)
         {
-            if (accessorySlot > ChaControl.fileStatus.showAccessory.Length) return;
-            ChaControl.fileStatus.showAccessory[accessorySlot] = stateValue;
+            int coord = ChaControl.fileStatus.coordinateType;
+            if (boneEdits.TryGetValue(coord, out var edits) && edits != null)
+            {
+                var edit = edits.FirstOrDefault(e => e.GraphKey == graphKey);
+                if (edit != null)
+                {
+                    SetBoneEditActive(edit.Id, stateValue);
+                }
+            }
         }
 
         public void Show(bool resetPostion)
         {
             if (lfg == null) createGraph();
             displayGraph = true;
-            AnalCameraComponent acc = rCam.GetOrAddComponent<AnalCameraComponent>();
+            AnblCameraComponent acc = rCam.GetOrAddComponent<AnblCameraComponent>();
             acc.OnPostRenderEvent += postRenderEvent;
-            lfg.setUIScaleModifier(AmazingNewAccessoryLogic.UIScaleModifier.Value);
+            lfg.setUIScaleModifier(AmazingNewBoneLogic.UIScaleModifier.Value);
             GameCursor c = GameCursor.Instance;
             if (resetPostion)
             {
@@ -1226,8 +1294,8 @@ namespace AmazingNewAccessoryLogic
         public void Hide()
         {
             displayGraph = false;
-            if (MakerAPI.InsideAndLoaded) AmazingNewAccessoryLogic.SidebarToggle.Value = false;
-            AnalCameraComponent acc = rCam.GetComponent<AnalCameraComponent>();
+            if (MakerAPI.InsideAndLoaded) AmazingNewBoneLogic.SidebarToggle.Value = false;
+            AnblCameraComponent acc = rCam.GetComponent<AnblCameraComponent>();
             if (acc != null) acc.OnPostRenderEvent -= postRenderEvent;
         }
 
@@ -1252,7 +1320,7 @@ namespace AmazingNewAccessoryLogic
         {
             rTex = new RenderTexture(Screen.width, Screen.height, 32);
             // Create a new camera
-            GameObject renderCameraObject = new GameObject("ANAL_UI_Camera");
+            GameObject renderCameraObject = new GameObject("ANBL_UI_Camera");
             renderCameraObject.transform.SetParent(this.transform);
             rCam = renderCameraObject.AddComponent<Camera>();
             rCam.targetTexture = rTex;
@@ -1261,6 +1329,100 @@ namespace AmazingNewAccessoryLogic
             rCam.cullingMask = 0;
 
             base.Start();
+            EnsureBoneEffectRegistered();
+        }
+
+        protected override void OnDestroy()
+        {
+            var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+            if (boneController != null && _boneEffect != null)
+            {
+                boneController.RemoveBoneEffect(_boneEffect);
+            }
+            base.OnDestroy();
+        }
+
+        public void EnsureBoneEffectRegistered()
+        {
+            if (_boneEffect == null)
+            {
+                _boneEffect = new ANBLBoneEffect();
+            }
+            var boneController = ChaControl.GetComponent<KKABMX.Core.BoneController>();
+            if (boneController != null)
+            {
+                boneController.AddBoneEffect(_boneEffect);
+            }
+        }
+
+        public void SetBoneEditActive(string editId, bool active)
+        {
+            bool changed = false;
+            if (active)
+            {
+                changed = activeBoneEditIds.Add(editId);
+            }
+            else
+            {
+                changed = activeBoneEditIds.Remove(editId);
+            }
+            if (changed)
+            {
+                var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                if (boneController != null)
+                {
+                    boneController.NeedsFullRefresh = true;
+                }
+            }
+        }
+
+        public IEnumerable<string> GetActiveBoneNames()
+        {
+            int coord = ChaControl.fileStatus.coordinateType;
+            if (!boneEdits.TryGetValue(coord, out var edits) || edits == null)
+                return Enumerable.Empty<string>();
+
+            if (displayBoneEditor)
+            {
+                return edits
+                    .Where(e => !string.IsNullOrEmpty(e.BoneName))
+                    .Select(e => e.BoneName)
+                    .Distinct();
+            }
+
+            return edits
+                .Where(e => activeBoneEditIds.Contains(e.Id) && !string.IsNullOrEmpty(e.BoneName))
+                .Select(e => e.BoneName)
+                .Distinct();
+        }
+
+        public BoneModifierData GetAggregateModifier(string bone, int coordinate)
+        {
+            if (!boneEdits.TryGetValue(coordinate, out var edits) || edits == null)
+                return null;
+
+            var activeEdits = edits
+                .Where(e => e.BoneName == bone && (displayBoneEditor || activeBoneEditIds.Contains(e.Id)) && e.Modifier != null)
+                .ToList();
+
+            if (activeEdits.Count == 0)
+                return null;
+
+            Vector3 scale = Vector3.one;
+            float length = 1f;
+            Vector3 position = Vector3.zero;
+            Vector3 rotation = Vector3.zero;
+
+            foreach (var edit in activeEdits)
+            {
+                var mod = edit.Modifier;
+                scale = Vector3.Scale(scale, mod.ScaleModifier);
+                length *= mod.LengthModifier;
+                position += mod.PositionModifier;
+                rotation += mod.RotationModifier;
+            }
+
+            return new BoneModifierData(scale, length, position, rotation);
         }
 
         protected override void Update()
@@ -1277,20 +1439,21 @@ namespace AmazingNewAccessoryLogic
                 }
 
                 lfg.update();
+                SyncNamesAndDeletedNodes();
                 if (MakerAPI.InsideAndLoaded)
                 {
                     if (lfg.eatingInput
-                        && AmazingNewAccessoryLogic.Instance.getMakerCursorMangaer() != null
-                        && AmazingNewAccessoryLogic.Instance.getMakerCursorMangaer().isActiveAndEnabled == true)
+                        && AmazingNewBoneLogic.Instance.getMakerCursorMangaer() != null
+                        && AmazingNewBoneLogic.Instance.getMakerCursorMangaer().isActiveAndEnabled == true)
                     {
-                        AmazingNewAccessoryLogic.Instance.getMakerCursorMangaer().enabled = false;
+                        AmazingNewBoneLogic.Instance.getMakerCursorMangaer().enabled = false;
                     }
 
                     if (!lfg.eatingInput
-                        && AmazingNewAccessoryLogic.Instance.getMakerCursorMangaer() != null
-                        && AmazingNewAccessoryLogic.Instance.getMakerCursorMangaer().isActiveAndEnabled == false)
+                        && AmazingNewBoneLogic.Instance.getMakerCursorMangaer() != null
+                        && AmazingNewBoneLogic.Instance.getMakerCursorMangaer().isActiveAndEnabled == false)
                     {
-                        AmazingNewAccessoryLogic.Instance.getMakerCursorMangaer().enabled = true;
+                        AmazingNewBoneLogic.Instance.getMakerCursorMangaer().enabled = true;
                     }
                 }
             }
@@ -1388,7 +1551,7 @@ namespace AmazingNewAccessoryLogic
             new List<string> {
                 "ASS Data Conversion",
                 "Feature is experimental, no guarantees!!\n" +
-                "Tries to convert Accessory State Sync data saved in the card to a ANAL graph\n" +
+                "Tries to convert Accessory State Sync data saved in the card to a ANBL graph\n" +
                 "Only Accessories with ONE or TWO connected clothing slots are supported\n" +
                 "The generated nodes will not be sorted properly and overlap\n" +
                 "The generated graph can often be simplified a lot"
@@ -1478,6 +1641,11 @@ namespace AmazingNewAccessoryLogic
                             }
 
                             GUILayout.FlexibleSpace();
+                            if (GUILayout.Button("Bone Editor"))
+                            {
+                                displayBoneEditor = !displayBoneEditor;
+                                if (displayBoneEditor) BuildBoneCache();
+                            }
                             if (GUILayout.Button("Adv. Mode"))
                             {
                                 confirmRect =
@@ -1490,7 +1658,7 @@ namespace AmazingNewAccessoryLogic
                                 onConfirm = () =>
                                 {
                                     graphData[lfg].advanced = true;
-                                    AmazingNewAccessoryLogic.UpdateMakerButtonVisibility();
+                                    AmazingNewBoneLogic.UpdateMakerButtonVisibility();
                                 };
                                 isConfirming = true;
                             }
@@ -1516,60 +1684,72 @@ namespace AmazingNewAccessoryLogic
                             var wS = simpleWindowRect.size;
                             var size = new Vector2(wS.x / 2f - 12.5f, wS.y - 50f);
 
-                            // Accs list
+                            // Bone Edits list
                             var acsRect = new Rect(new Vector2(10f, 40f), size);
                             GUI.Box(acsRect, "");
                             GUILayout.BeginArea(acsRect, "");
                             simpleWindowScrollPosAcs = GUILayout.BeginScrollView(simpleWindowScrollPosAcs, false, true);
                             {
-                                if (!ChaControl.infoAccessory.Any(x => x != null))
+                                int coordVal = ChaControl.fileStatus.coordinateType;
+                                if (!boneEdits.TryGetValue(coordVal, out var editsList) || editsList == null)
                                 {
-                                    GUILayout.Label("No accessories!");
+                                    editsList = new List<BoneEffectEdit>();
+                                    boneEdits[coordVal] = editsList;
+                                }
+
+                                if (editsList.Count == 0)
+                                {
+                                    GUILayout.Label("No bone edits defined for this outfit!");
+                                    if (GUILayout.Button("Open Bone Editor", GUILayout.Height(30)))
+                                    {
+                                        displayBoneEditor = true;
+                                        BuildBoneCache();
+                                    }
                                 }
                                 else
                                 {
                                     int numBtns = 0;
-                                    var acsInGroups = data.GetAllChildIndices();
-                                    for (int i = 0; i < ChaControl.infoAccessory.Length; i++)
+                                    var editsInGroups = data.GetAllChildIndices();
+                                    for (int i = 0; i < editsList.Count; i++)
                                     {
-                                        if (ChaControl.infoAccessory[i] == null) continue;
-                                        if (acsInGroups.Contains(i)) continue;
+                                        var edit = editsList[i];
+                                        if (editsInGroups.Contains(edit.GraphKey)) continue;
                                         numBtns++;
-                                        var accBoxSize = new Vector2(acsRect.size.x - 18f, 70);
+                                        var boxSize = new Vector2(acsRect.size.x - 18f, 70);
                                         GUILayout.Space(2);
-                                        float yStart = (numBtns - 1) * (accBoxSize.y + 2f);
+                                        float yStart = (numBtns - 1) * (boxSize.y + 2f);
                                         // Only draw visible buttons to save on some garbage
-                                        if (yStart + accBoxSize.y > simpleWindowScrollPosAcs.y &&
+                                        if (yStart + boxSize.y > simpleWindowScrollPosAcs.y &&
                                             yStart < simpleWindowScrollPosAcs.y + acsRect.height)
                                         {
                                             GUILayout.Box("", solidSkin.window,
                                                 new[]
                                                 {
-                                                    GUILayout.Width(accBoxSize.x), GUILayout.Height(accBoxSize.y)
+                                                    GUILayout.Width(boxSize.x), GUILayout.Height(boxSize.y)
                                                 });
-                                            GUILayout.Space(-(accBoxSize.y + 3));
+                                            GUILayout.Space(-(boxSize.y + 3));
                                             GUILayout.BeginVertical();
                                             {
                                                 GUILayout.BeginHorizontal();
                                                 {
                                                     GUILayout.Space(5);
-                                                    GUILayout.Label(ChaControl.infoAccessory[i].Name);
+                                                    GUILayout.Label(edit.Name);
                                                     GUILayout.FlexibleSpace();
-                                                    GUILayout.Label($"Slot {i + 1}");
+                                                    GUILayout.Label(edit.BoneName);
                                                     GUILayout.Space(3);
                                                 }
                                                 GUILayout.EndHorizontal();
                                                 var offset = new Vector2(
                                                     15f,
-                                                    numBtns * (accBoxSize.y + 2f) + 35f - simpleWindowScrollPosAcs.y
+                                                    numBtns * (boxSize.y + 2f) + 35f - simpleWindowScrollPosAcs.y
                                                 );
-                                                DoBindings(i + 1000000, offset);
+                                                DoBindings(edit.GraphKey + 1000000, offset);
                                             }
                                             GUILayout.EndVertical();
                                         }
                                         else
                                         {
-                                            GUILayout.Space(accBoxSize.y - 2f);
+                                            GUILayout.Space(boxSize.y - 2f);
                                         }
 
                                         GUILayout.Space(2);
@@ -1636,7 +1816,7 @@ namespace AmazingNewAccessoryLogic
                                                 {
                                                     if (GUILayout.Button("Animate"))
                                                     {
-                                                        AmazingNewAccessoryLogic.Logger.LogMessage(
+                                                        AmazingNewBoneLogic.Logger.LogMessage(
                                                             "Group node selected!");
                                                         TimelineHelper.SelectGroup(node);
                                                     }
@@ -1721,11 +1901,14 @@ namespace AmazingNewAccessoryLogic
                                                     };
                                                     foreach (var child in grpChildren)
                                                     {
+                                                        int coordVal = ChaControl.fileStatus.coordinateType;
+                                                        var edit = boneEdits.TryGetValue(coordVal, out var listEdits) ? listEdits.FirstOrDefault(e => e.GraphKey == child) : null;
+                                                        string editName = edit != null ? edit.Name : $"Bone Edit {child}";
                                                         GUILayout.BeginHorizontal();
                                                         {
                                                             GUILayout.Space(5);
                                                             GUILayout.Label(
-                                                                $"Slot {child + 1} - {ChaControl.infoAccessory[child].Name}",
+                                                                $"{editName}",
                                                                 leftText, GUILayout.MaxWidth(grpBoxSize.x - 75));
                                                             GUILayout.FlexibleSpace();
                                                             bool isOn = node.controlledNodes.TryGetValue(node.state,
@@ -1911,7 +2094,7 @@ namespace AmazingNewAccessoryLogic
                         GUI.Box(new Rect(simpleWindowRect.size - new Vector2(13, 13), new Vector2(13, 13)), "",
                             whiteBox);
                         simpleWindowRect = IMGUIUtils.DragResizeEatWindow(simpleModeWindowID, simpleWindowRect);
-                    }, $"ANAL v{AmazingNewAccessoryLogic.Version} - Simple Mode", solidSkin.window);
+                    }, $"ANBL v{AmazingNewBoneLogic.Version} - Simple Mode", solidSkin.window);
                 var sWP = simpleWindowRect.position;
                 var sWS = simpleWindowRect.size;
                 simpleWindowRect.position = new Vector2(
@@ -1950,7 +2133,7 @@ namespace AmazingNewAccessoryLogic
 
                 GUI.Label(
                     new Rect(screenToGUI(lfg.positionUI + new Vector2(10, lfg.sizeUI.y + (lfg.getUIScale() * 20) + 15)),
-                        new Vector2(250, 25)), $"AmazingNewAccessoryLogic v{AmazingNewAccessoryLogic.Version}",
+                        new Vector2(250, 25)), $"AmazingNewBoneLogic v{AmazingNewBoneLogic.Version}",
                     headerTextStyle);
                 var closeRect =
                     new Rect(screenToGUI(lfg.positionUI + lfg.sizeUI + new Vector2(-65, (lfg.getUIScale() * 28) + 4)),
@@ -1964,7 +2147,7 @@ namespace AmazingNewAccessoryLogic
                     onConfirm = () =>
                     {
                         graphData[lfg].advanced = false;
-                        AmazingNewAccessoryLogic.UpdateMakerButtonVisibility();
+                        AmazingNewBoneLogic.UpdateMakerButtonVisibility();
                     };
                     isConfirming = true;
                 }
@@ -1985,6 +2168,12 @@ namespace AmazingNewAccessoryLogic
                     if (GUILayout.Button("Add OR Gate", GUILayout.Height(30))) addGate(2);
                     if (GUILayout.Button("Add XOR Gate", GUILayout.Height(30))) addGate(3);
                     if (GUILayout.Button("Add Group Node", GUILayout.Height(30))) addGate(4);
+                    GUILayout.Space(8);
+                    if (GUILayout.Button("Bone Editor", GUILayout.Height(30)))
+                    {
+                        displayBoneEditor = !displayBoneEditor;
+                        if (displayBoneEditor) BuildBoneCache();
+                    }
                     GUILayout.Space(8);
                     if (GUILayout.Button("Advanced Inputs", GUILayout.Height(30)))
                         showAdvancedInputWindow = !showAdvancedInputWindow;
@@ -2010,22 +2199,6 @@ namespace AmazingNewAccessoryLogic
 
                     if (StudioAPI.InsideStudio)
                     {
-                        GUILayout.BeginHorizontal();
-                        studioAddOutputTextInput = GUILayout.TextField(studioAddOutputTextInput);
-                        if (GUILayout.Button("+", GUILayout.Width(25)) &&
-                            int.TryParse(studioAddOutputTextInput, out int a))
-                            studioAddOutputTextInput = (a + 1).ToString();
-                        if (GUILayout.Button("-", GUILayout.Width(25)) &&
-                            int.TryParse(studioAddOutputTextInput, out int b) &&
-                            b > 1) studioAddOutputTextInput = (b - 1).ToString();
-                        GUILayout.EndHorizontal();
-                        if (GUILayout.Button("Add Output"))
-                        {
-                            if (int.TryParse(studioAddOutputTextInput, out int slot) && slot >= 1)
-                            {
-                                addOutput(slot - 1);
-                            }
-                        }
 
                         if (TimelineCompatibility.IsTimelineAvailable())
                         {
@@ -2033,19 +2206,19 @@ namespace AmazingNewAccessoryLogic
                             {
                                 if (lfg.selectedNodes.Count != 1)
                                 {
-                                    AmazingNewAccessoryLogic.Logger.LogMessage("Select one Group node to animate!");
+                                    AmazingNewBoneLogic.Logger.LogMessage("Select one Group node to animate!");
                                 }
                                 else
                                 {
                                     var selected = lfg.getNodeAt(lfg.selectedNodes[0]);
                                     if (!(selected is LogicFlowNode_GRP))
                                     {
-                                        AmazingNewAccessoryLogic.Logger.LogMessage("Select one Group node to animate!");
+                                        AmazingNewBoneLogic.Logger.LogMessage("Select one Group node to animate!");
                                     }
                                     else
                                     {
-                                        AmazingNewAccessoryLogic.Logger.LogMessage(
-                                            "Activated interpolable: ANAL -> Group state");
+                                        AmazingNewBoneLogic.Logger.LogMessage(
+                                            "Activated interpolable: ANBL -> Group state");
                                         TimelineHelper.SelectGroup((LogicFlowNode_GRP)selected);
                                     }
                                 }
@@ -2118,7 +2291,7 @@ namespace AmazingNewAccessoryLogic
                                 // Renaming
                                 if (e.button == 1 && kvp.Value.mouseOver)
                                 {
-                                    AmazingNewAccessoryLogic.Logger.LogDebug($"Renaming ({kvp.Value.label})!");
+                                    AmazingNewBoneLogic.Logger.LogDebug($"Renaming ({kvp.Value.label})!");
                                     renamedNode = kvp.Key;
                                     if (kvp.Value is LogicFlowNode_GRP grp) renameName = grp.getName();
                                     else renameName = kvp.Value.label;
@@ -2130,7 +2303,7 @@ namespace AmazingNewAccessoryLogic
                                 // Group activation selection
                                 if (e.button == 1 && kvp.Value.outputHovered && kvp.Value is LogicFlowNode_GRP grp)
                                 {
-                                    AmazingNewAccessoryLogic.Logger.LogDebug(
+                                    AmazingNewBoneLogic.Logger.LogDebug(
                                         $"Selecting outputs for ({grp.getName()})...");
                                     groupToSetActives = grp;
                                     groupScrollRect = new Rect(e.mousePosition - new Vector2(-5, 120),
@@ -2146,7 +2319,7 @@ namespace AmazingNewAccessoryLogic
                                 if ((e.button == 0 || e.button == 1) && kvp.Value.inputHovered != null &&
                                     kvp.Value is LogicFlowOutput output)
                                 {
-                                    AmazingNewAccessoryLogic.Logger.LogDebug(
+                                    AmazingNewBoneLogic.Logger.LogDebug(
                                         $"New connection to ({output.label}), syncing!");
                                     StartCoroutine(updateLater());
                                     break;
@@ -2329,17 +2502,19 @@ namespace AmazingNewAccessoryLogic
                                 grpAddFilter = GUILayout.TextField(grpAddFilter);
                             }
                             GUILayout.EndHorizontal();
-                            for (int i = 0; i < ChaControl.infoAccessory.Length; i++)
+                            int coordVal = ChaControl.fileStatus.coordinateType;
+                            if (boneEdits.TryGetValue(coordVal, out var editsList) && editsList != null)
                             {
-                                if (ChaControl.infoAccessory[i] == null) continue;
-                                if (allChildren.Contains(i)) continue;
-                                if (grpAddFilter.Length > 0 && !ChaControl.infoAccessory[i].Name.ToLower()
-                                        .Contains(grpAddFilter.ToLower())) continue;
-                                if (GUILayout.Button($"Slot {i + 1} - {ChaControl.infoAccessory[i].Name}", leftText))
+                                foreach (var edit in editsList)
                                 {
-                                    graphData[lfg].AddChild(grpBeingAddedTo.Value, i);
-                                    grpBeingAddedTo = null;
-                                    break;
+                                    if (allChildren.Contains(edit.GraphKey)) continue;
+                                    if (grpAddFilter.Length > 0 && edit.Name.IndexOf(grpAddFilter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                                    if (GUILayout.Button($"{edit.Name}", leftText))
+                                    {
+                                        graphData[lfg].AddChild(grpBeingAddedTo.Value, edit.GraphKey);
+                                        grpBeingAddedTo = null;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -2383,6 +2558,26 @@ namespace AmazingNewAccessoryLogic
             }
 
             #endregion
+
+            if (displayBoneEditor)
+            {
+                var solidSkin = IMGUIUtils.SolidBackgroundGuiSkin;
+                boneEditorWindowRect = GUILayout.Window(boneEditorWindowID, boneEditorWindowRect, DrawBoneEditorWindow, "ANBL Bone Editor", solidSkin.window);
+                
+                // Keep window on screen
+                var bEP = boneEditorWindowRect.position;
+                var bES = boneEditorWindowRect.size;
+                boneEditorWindowRect.position = new Vector2(
+                    Mathf.Clamp(bEP.x, -bES.x * 0.9f, Screen.width - bES.x * 0.1f),
+                    Mathf.Clamp(bEP.y, -bES.y * 0.9f, Screen.height - bES.y * 0.1f)
+                );
+                
+                if (showTransferPopup)
+                {
+                    transferPopupRect = GUILayout.Window(transferPopupID, transferPopupRect, DrawTransferPopup, "Select Destination Slot", solidSkin.window);
+                    GUI.BringWindowToFront(transferPopupID);
+                }
+            }
         }
 
         void InitGUI()
@@ -2741,7 +2936,7 @@ namespace AmazingNewAccessoryLogic
 
         private void CreateNodesForAssData(Dictionary<int, Dictionary<int, TriggerProperty[]>> data, int outfit)
         {
-            AmazingNewAccessoryLogic.Logger.LogInfo($"Creating Logic for {data.Keys.Count} slots on outfit {outfit}");
+            AmazingNewBoneLogic.Logger.LogInfo($"Creating Logic for {data.Keys.Count} slots on outfit {outfit}");
             if (!graphs.TryGetValue(outfit, out LogicFlowGraph graph)) graph = createGraph(outfit);
             graphData[graphs[outfit]].advanced = true;
 
@@ -2753,7 +2948,7 @@ namespace AmazingNewAccessoryLogic
                 // clothing slot -> trigger property
                 Dictionary<int, TriggerProperty[]> slotData = data[slot];
 
-                AmazingNewAccessoryLogic.Logger.LogDebug($"Converting TriggerProperties for accessory slot {slot}");
+                AmazingNewBoneLogic.Logger.LogDebug($"Converting TriggerProperties for accessory slot {slot}");
 
                 LogicFlowNode output = getOutput(slot, outfit);
                 if (output == null)
@@ -2772,7 +2967,7 @@ namespace AmazingNewAccessoryLogic
                         if (trig.Visible && validTrigger(trig)) statesThatTurnTheOutputOn.Add(trig.ClothingState);
                     }
 
-                    AmazingNewAccessoryLogic.Logger.LogDebug(
+                    AmazingNewBoneLogic.Logger.LogDebug(
                         $"Found 1 clothing slot [{clothingSlot}] for acc {slot}: States that turn the ouput on: {statesThatTurnTheOutputOn}");
                     switch (statesThatTurnTheOutputOn.Count)
                     {
@@ -2799,7 +2994,7 @@ namespace AmazingNewAccessoryLogic
                         outfitSlots.Add(key);
                     }
 
-                    AmazingNewAccessoryLogic.Logger.LogDebug($"Found 2 clothing slots {outfitSlots} for acc {slot}:");
+                    AmazingNewBoneLogic.Logger.LogDebug($"Found 2 clothing slots {outfitSlots} for acc {slot}:");
                     for (int i = 0; i < 4; i++) // for each state in outfitSlot1
                     {
                         TriggerProperty A = triggerProperties[0][i];
@@ -2822,12 +3017,12 @@ namespace AmazingNewAccessoryLogic
                             }
                         }
 
-                        AmazingNewAccessoryLogic.Logger.LogDebug(
+                        AmazingNewBoneLogic.Logger.LogDebug(
                             $"-> ClothingSlot A ({outfitSlots[0]}) State {i} claims visible={A.Visible} and priority={A.Priority}; B ({outfitSlots[1]}) claims visible={outfitSlot2.Select(trig => trig.Visible)} and priority={outfitSlot2.Select(trig => trig.Priority)}, therefor sates that turn the output on {statesThatTurnTheOutputOn} ");
                         switch (statesThatTurnTheOutputOn.Count)
                         {
                             case 0:
-                                AmazingNewAccessoryLogic.Logger.LogDebug(
+                                AmazingNewBoneLogic.Logger.LogDebug(
                                     $"--> ClothingSlot A has full priority, and visible is {A.Visible}");
                                 if (i == 3 && output is LogicFlowNode_OR)
                                 {
@@ -2849,7 +3044,7 @@ namespace AmazingNewAccessoryLogic
                             case 1:
                             case 2:
                             case 3:
-                                AmazingNewAccessoryLogic.Logger.LogDebug(
+                                AmazingNewBoneLogic.Logger.LogDebug(
                                     $"--> ClothingSlot B has priority on states {statesThatTurnTheOutputOn}");
                                 LogicFlowNode connectedInputs = connectInputs(statesThatTurnTheOutputOn, outfitSlots[1],
                                     outfit, graph);
@@ -2871,7 +3066,7 @@ namespace AmazingNewAccessoryLogic
 
                                 break;
                             case 4:
-                                AmazingNewAccessoryLogic.Logger.LogDebug(
+                                AmazingNewBoneLogic.Logger.LogDebug(
                                     $"--> ClothingSlot A has full priority, and visible is {A.Visible}");
                                 if (i != 3)
                                 {
@@ -2894,7 +3089,7 @@ namespace AmazingNewAccessoryLogic
 
                 if (slotData.Keys.Count > 2)
                 {
-                    AmazingNewAccessoryLogic.Logger.LogWarning(
+                    AmazingNewBoneLogic.Logger.LogWarning(
                         $"Found {slotData.Keys.Count} clothing slots ({slotData.Keys.ToList()}) connected to slot {slot}. Due to the complexity of the translation a max or 2 clothing slots is supported.");
                 }
 
@@ -2908,7 +3103,7 @@ namespace AmazingNewAccessoryLogic
             PluginData _pluginData = ExtendedSave.GetExtendedDataById(chaFile, "madevil.kk.ass");
             if (_pluginData == null)
             {
-                AmazingNewAccessoryLogic.Logger.LogInfo($"No ASS Data found on {chaFile.charaFileName}" +
+                AmazingNewBoneLogic.Logger.LogInfo($"No ASS Data found on {chaFile.charaFileName}" +
                                                         (OutfitSlot.HasValue ? $" and slot {OutfitSlot.Value}" : ""));
                 return;
             }
@@ -2918,8 +3113,8 @@ namespace AmazingNewAccessoryLogic
             {
                 _triggers = MessagePackSerializer.Deserialize<List<TriggerProperty>>((byte[])ByteData);
 #if KKS
-                //AmazingNewAccessoryLogic.Logger.LogInfo(MakerAPI.LastLoadedChaFile.GetLastErrorCode());
-                //AmazingNewAccessoryLogic.Logger.LogInfo(ChaFileControl.GetLastErrorCode());
+                //AmazingNewBoneLogic.Logger.LogInfo(MakerAPI.LastLoadedChaFile.GetLastErrorCode());
+                //AmazingNewBoneLogic.Logger.LogInfo(ChaFileControl.GetLastErrorCode());
                 if (kkcompatibility)
                 {
                     _triggers.ForEach(t => t.Coordinate = OutfitKK2KKS(t.Coordinate));
@@ -2930,12 +3125,12 @@ namespace AmazingNewAccessoryLogic
 
             if (_triggers.IsNullOrEmpty())
             {
-                AmazingNewAccessoryLogic.Logger.LogInfo($"No Valid TriggerProperties found on {chaFile.charaFileName}" +
+                AmazingNewBoneLogic.Logger.LogInfo($"No Valid TriggerProperties found on {chaFile.charaFileName}" +
                                                         (OutfitSlot.HasValue ? $" and slot {OutfitSlot.Value}" : ""));
                 return;
             }
 
-            AmazingNewAccessoryLogic.Logger.LogInfo(
+            AmazingNewBoneLogic.Logger.LogInfo(
                 $"Found {_triggers.Count} valid TriggerProperties on {chaFile.charaFileName}" +
                 (OutfitSlot.HasValue ? $" and slot {OutfitSlot.Value}" : ""));
             // <Outfit, <AccessorySlot, <ClothingSlot, <ClothingState>>>>
@@ -2945,7 +3140,7 @@ namespace AmazingNewAccessoryLogic
             {
                 if (tp.ClothingSlot >= 9) // There is only clothing slots 0-8, so >=9 indicates a custom group
                 {
-                    AmazingNewAccessoryLogic.Logger.LogInfo(
+                    AmazingNewBoneLogic.Logger.LogInfo(
                         $"Coustom group trigger property found for Accessory {tp.Slot}, ClothingSlot {tp.ClothingSlot}; This is not supported (yet)!");
                     continue;
                 }
@@ -2976,11 +3171,11 @@ namespace AmazingNewAccessoryLogic
             PluginData _pluginData = ExtendedSave.GetExtendedDataById(coordinate, "madevil.kk.ass");
             if (_pluginData == null)
             {
-                AmazingNewAccessoryLogic.Logger.LogInfo($"No ASS Data found on {coordinate.coordinateName}");
+                AmazingNewBoneLogic.Logger.LogInfo($"No ASS Data found on {coordinate.coordinateName}");
                 return;
             }
 
-            AmazingNewAccessoryLogic.Logger.LogInfo("Reading ASS Data");
+            AmazingNewBoneLogic.Logger.LogInfo("Reading ASS Data");
             List<TriggerProperty> _triggers = new List<TriggerProperty>();
             if (_pluginData.data.TryGetValue("TriggerPropertyList", out var ByteData) && ByteData != null)
             {
@@ -2989,13 +3184,13 @@ namespace AmazingNewAccessoryLogic
 
             if (_triggers.IsNullOrEmpty())
             {
-                AmazingNewAccessoryLogic.Logger.LogInfo($"No TriggerProperties found on {coordinate.coordinateName}");
+                AmazingNewBoneLogic.Logger.LogInfo($"No TriggerProperties found on {coordinate.coordinateName}");
                 return;
             }
 
-            AmazingNewAccessoryLogic.Logger.LogInfo(
+            AmazingNewBoneLogic.Logger.LogInfo(
                 $"Found {_triggers.Count} valid TriggerProperties on {coordinate.coordinateName}");
-            AmazingNewAccessoryLogic.Logger.LogInfo($"Processing ASS Data: {_triggers.Count} TriggerProperties found");
+            AmazingNewBoneLogic.Logger.LogInfo($"Processing ASS Data: {_triggers.Count} TriggerProperties found");
             // <AccessorySlot, <ClothingSlot, <ClothingState>>>
             Dictionary<int, Dictionary<int, TriggerProperty[]>> triggersForSlot =
                 new Dictionary<int, Dictionary<int, TriggerProperty[]>>();
@@ -3003,7 +3198,7 @@ namespace AmazingNewAccessoryLogic
             {
                 if (tp.ClothingSlot >= 9) // There is only clothing slots 0-8, so >=9 indicates a custom group
                 {
-                    AmazingNewAccessoryLogic.Logger.LogInfo(
+                    AmazingNewBoneLogic.Logger.LogInfo(
                         $"Custom group trigger property found for Accessory {tp.Slot}, ClothingSlot {tp.ClothingSlot}; This is not supported (yet)!");
                     continue;
                 }
@@ -3016,6 +3211,575 @@ namespace AmazingNewAccessoryLogic
             }
 
             CreateNodesForAssData(triggersForSlot, ChaControl.fileStatus.coordinateType);
+        }
+
+        #endregion
+
+        #region Bone Editor GUI
+
+        // Bone Editor UI state
+        internal bool displayBoneEditor = false;
+        private Rect boneEditorWindowRect = new Rect(100, 100, 1000, 600);
+        private Vector2 boneListScrollPos = Vector2.zero;
+        private Vector2 boneTreeScrollPos = Vector2.zero;
+        private Vector2 modifierScrollPos = Vector2.zero;
+        private string boneEffectSearch = "";
+        private string boneTreeSearch = "";
+        private BoneEffectEdit selectedBoneEdit = null;
+        private Transform selectedBoneTransform = null;
+        private HashSet<GameObject> openedBones = new HashSet<GameObject>();
+        private BoneEffectEdit clipboardBoneEdit = null;
+        private bool deleteMode = false;
+        private bool transferMode = false;
+        private HashSet<string> selectedForTransfer = new HashSet<string>();
+        private List<Transform> cachedBones = new List<Transform>();
+        
+        // Transfer destination coordinate selection popup state
+        private bool showTransferPopup = false;
+        private Rect transferPopupRect = new Rect(400, 200, 250, 250);
+
+        private void BuildBoneCache()
+        {
+            cachedBones.Clear();
+            if (ChaControl.objBodyBone != null)
+                TraverseAndCache(ChaControl.objBodyBone.transform);
+            if (ChaControl.objHeadBone != null)
+                TraverseAndCache(ChaControl.objHeadBone.transform);
+        }
+
+        private void TraverseAndCache(Transform t)
+        {
+            if (t == null) return;
+            cachedBones.Add(t);
+            for (int i = 0; i < t.childCount; i++)
+            {
+                TraverseAndCache(t.GetChild(i));
+            }
+        }
+
+        private Transform FindBoneTransform(string boneName)
+        {
+            if (string.IsNullOrEmpty(boneName)) return null;
+            return cachedBones.FirstOrDefault(b => b != null && b.name == boneName);
+        }
+
+        private void DrawBoneEditorWindow(int windowId)
+        {
+            var solidSkin = IMGUIUtils.SolidBackgroundGuiSkin;
+            int coord = ChaControl.fileStatus.coordinateType;
+            if (!boneEdits.TryGetValue(coord, out var list) || list == null)
+            {
+                list = new List<BoneEffectEdit>();
+                boneEdits[coord] = list;
+            }
+
+            GUILayout.BeginHorizontal();
+
+            // Column 1: BoneEffect List
+            GUILayout.BeginVertical(GUILayout.Width(250));
+            {
+                GUILayout.Label("Bone Edits", GUI.skin.box);
+                
+                // Search bar
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Filter:", GUILayout.Width(45));
+                boneEffectSearch = GUILayout.TextField(boneEffectSearch);
+                GUILayout.EndHorizontal();
+
+                // Delete/Transfer mode prompt/buttons
+                if (deleteMode)
+                {
+                    GUILayout.Label("DELETE MODE: Select edits", GUI.skin.box);
+                }
+                else if (transferMode)
+                {
+                    GUILayout.Label("TRANSFER MODE: Select edits", GUI.skin.box);
+                }
+
+                boneListScrollPos = GUILayout.BeginScrollView(boneListScrollPos, GUILayout.ExpandHeight(true));
+                {
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var edit = list[i];
+                        
+                        // Apply filter
+                        if (!string.IsNullOrEmpty(boneEffectSearch) && 
+                            edit.Name.IndexOf(boneEffectSearch, StringComparison.OrdinalIgnoreCase) < 0 &&
+                            edit.BoneName.IndexOf(boneEffectSearch, StringComparison.OrdinalIgnoreCase) < 0)
+                            continue;
+
+                        GUILayout.BeginHorizontal();
+                        
+                        if (deleteMode || transferMode)
+                        {
+                            bool isSelected = selectedForTransfer.Contains(edit.Id);
+                            if (GUILayout.Toggle(isSelected, "", GUILayout.Width(20)))
+                            {
+                                selectedForTransfer.Add(edit.Id);
+                            }
+                            else
+                            {
+                                selectedForTransfer.Remove(edit.Id);
+                            }
+                        }
+
+                        GUI.color = (selectedBoneEdit == edit) ? Color.cyan : Color.white;
+                        if (GUILayout.Button($"{edit.Name}\n<size=10>({edit.BoneName})</size>", new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft }))
+                        {
+                            selectedBoneEdit = edit;
+                            selectedBoneTransform = FindBoneTransform(edit.BoneName);
+                        }
+                        GUI.color = Color.white;
+
+                        // Quick X button (only in normal mode)
+                        if (!deleteMode && !transferMode)
+                        {
+                            if (GUILayout.Button("X", GUILayout.Width(25), GUILayout.Height(30)))
+                            {
+                                list.RemoveAt(i);
+                                activeBoneEditIds.Remove(edit.Id);
+                                lfg.RemoveNode(1000000 + edit.GraphKey);
+                                if (selectedBoneEdit == edit) selectedBoneEdit = null;
+                                i--;
+                                GUILayout.EndHorizontal();
+                                continue;
+                            }
+                        }
+
+                        GUILayout.EndHorizontal();
+                    }
+                }
+                GUILayout.EndScrollView();
+
+                // Column 1 Bottom Buttons
+                GUILayout.Space(5);
+                if (deleteMode)
+                {
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Cancel"))
+                    {
+                        deleteMode = false;
+                        selectedForTransfer.Clear();
+                    }
+                    if (GUILayout.Button("Delete Selected"))
+                    {
+                        foreach (var id in selectedForTransfer)
+                        {
+                            var edit = list.FirstOrDefault(x => x.Id == id);
+                            if (edit != null)
+                            {
+                                lfg.RemoveNode(1000000 + edit.GraphKey);
+                                activeBoneEditIds.Remove(edit.Id);
+                            }
+                        }
+                        list.RemoveAll(x => selectedForTransfer.Contains(x.Id));
+                        deleteMode = false;
+                        selectedForTransfer.Clear();
+                        selectedBoneEdit = null;
+                    }
+                    GUILayout.EndHorizontal();
+                }
+                else if (transferMode)
+                {
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Cancel"))
+                    {
+                        transferMode = false;
+                        selectedForTransfer.Clear();
+                    }
+                    if (GUILayout.Button("Transfer"))
+                    {
+                        showTransferPopup = true;
+                    }
+                    GUILayout.EndHorizontal();
+                }
+                else
+                {
+                    // Regular buttons: Export, Import, Delete, Transfer
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Export")) ExportEdits(list);
+                    if (GUILayout.Button("Import")) ImportEdits(list);
+                    GUILayout.EndHorizontal();
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Delete"))
+                    {
+                        deleteMode = true;
+                        selectedForTransfer.Clear();
+                    }
+                    if (GUILayout.Button("Transfer"))
+                    {
+                        transferMode = true;
+                        selectedForTransfer.Clear();
+                    }
+                    GUILayout.EndHorizontal();
+                }
+            }
+            GUILayout.EndVertical();
+
+            GUILayout.Box("", GUILayout.Width(2), GUILayout.ExpandHeight(true)); // separator
+
+            // Column 2: Collapsible Bone Tree
+            GUILayout.BeginVertical(GUILayout.Width(350));
+            {
+                GUILayout.Label("Bone Hierarchy", GUI.skin.box);
+                
+                // Search bar
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Search:", GUILayout.Width(50));
+                boneTreeSearch = GUILayout.TextField(boneTreeSearch);
+                GUILayout.EndHorizontal();
+
+                boneTreeScrollPos = GUILayout.BeginScrollView(boneTreeScrollPos, GUILayout.ExpandHeight(true));
+                {
+                    if (!string.IsNullOrEmpty(boneTreeSearch))
+                    {
+                        var matchingBones = cachedBones
+                            .Where(b => b != null && b.name.IndexOf(boneTreeSearch, StringComparison.OrdinalIgnoreCase) >= 0)
+                            .Take(100);
+                        
+                        foreach (var t in matchingBones)
+                        {
+                            GUILayout.BeginHorizontal();
+                            GUI.color = (selectedBoneTransform == t) ? Color.cyan : Color.white;
+                            if (GUILayout.Button(t.name, GUI.skin.label))
+                            {
+                                selectedBoneTransform = t;
+                                if (selectedBoneEdit != null)
+                                {
+                                    selectedBoneEdit.BoneName = t.name;
+                                }
+                            }
+                            GUI.color = Color.white;
+                            GUILayout.EndHorizontal();
+                        }
+                    }
+                    else
+                    {
+                        if (ChaControl.objBodyBone != null)
+                            RenderBoneTree(ChaControl.objBodyBone, 0);
+                        if (ChaControl.objHeadBone != null)
+                            RenderBoneTree(ChaControl.objHeadBone, 0);
+                    }
+                }
+                GUILayout.EndScrollView();
+            }
+            GUILayout.EndVertical();
+
+            GUILayout.Box("", GUILayout.Width(2), GUILayout.ExpandHeight(true)); // separator
+
+            // Column 3: Modifier Sliders
+            GUILayout.BeginVertical(GUILayout.Width(400));
+            {
+                GUILayout.Label("Modifications", GUI.skin.box);
+                modifierScrollPos = GUILayout.BeginScrollView(modifierScrollPos, GUILayout.ExpandHeight(true));
+                {
+                    if (selectedBoneEdit == null)
+                    {
+                        GUILayout.FlexibleSpace();
+                        GUILayout.Label("Select a bone edit from the left list to modify its parameters.", new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter });
+                        if (selectedBoneTransform != null)
+                        {
+                            GUILayout.Space(20);
+                            if (GUILayout.Button($"Create new bone edit for\n{selectedBoneTransform.name}", GUILayout.Height(55)))
+                            {
+                                int nextKey = (list.Count > 0) ? list.Max(e => e.GraphKey) + 1 : 0;
+                                var newEdit = new BoneEffectEdit(selectedBoneTransform.name)
+                                {
+                                    GraphKey = nextKey
+                                };
+                                list.Add(newEdit);
+                                selectedBoneEdit = newEdit;
+                            }
+                        }
+                        GUILayout.FlexibleSpace();
+                    }
+                    else
+                    {
+                        GUILayout.Label("Edit Details", GUI.skin.label);
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label("Name:", GUILayout.Width(50));
+                        selectedBoneEdit.Name = GUILayout.TextField(selectedBoneEdit.Name);
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.Label($"Target Bone: {selectedBoneEdit.BoneName}", GUI.skin.box);
+
+                        GUILayout.Space(10);
+                        GUILayout.Label("Modifiers", GUI.skin.label);
+
+                        var mod = selectedBoneEdit.Modifier;
+                        mod.ScaleModifier = DrawVector3Sliders("Scale", mod.ScaleModifier, 0.0f, 5.0f, 1.0f);
+                        mod.LengthModifier = DrawSingleSlider("Length", mod.LengthModifier, 0.0f, 5.0f, 1.0f);
+                        mod.PositionModifier = DrawVector3Sliders("Position", mod.PositionModifier, -10.0f, 10.0f, 0.0f);
+                        mod.RotationModifier = DrawVector3Sliders("Rotation", mod.RotationModifier, -360.0f, 360.0f, 0.0f);
+
+                        GUILayout.Space(15);
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button("Copy Modifiers"))
+                        {
+                            clipboardBoneEdit = selectedBoneEdit.Clone();
+                        }
+                        if (GUILayout.Button("Paste Modifiers") && clipboardBoneEdit != null)
+                        {
+                            clipboardBoneEdit.Modifier.CopyTo(selectedBoneEdit.Modifier);
+                        }
+                        GUILayout.EndHorizontal();
+
+                        GUILayout.Space(10);
+                        if (GUILayout.Button("Add Bone Edit to Logic Editor", GUILayout.Height(40)))
+                        {
+                            addOutput(selectedBoneEdit.GraphKey, coord, selectedBoneEdit.Name);
+                        }
+                    }
+                }
+                GUILayout.EndScrollView();
+            }
+            GUILayout.EndVertical();
+
+            GUILayout.EndHorizontal();
+        }
+
+        private Vector3 DrawVector3Sliders(string label, Vector3 value, float min, float max, float def)
+        {
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(70));
+            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            {
+                value = new Vector3(def, def, def);
+            }
+            GUILayout.EndHorizontal();
+
+            value.x = DrawSliderRow("  X", value.x, min, max);
+            value.y = DrawSliderRow("  Y", value.y, min, max);
+            value.z = DrawSliderRow("  Z", value.z, min, max);
+
+            GUILayout.EndVertical();
+            return value;
+        }
+
+        private float DrawSingleSlider(string label, float value, float min, float max, float def)
+        {
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(70));
+            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            {
+                value = def;
+            }
+            GUILayout.EndHorizontal();
+
+            value = DrawSliderRow("", value, min, max);
+
+            GUILayout.EndVertical();
+            return value;
+        }
+
+        private float DrawSliderRow(string subLabel, float value, float min, float max)
+        {
+            GUILayout.BeginHorizontal();
+            if (!string.IsNullOrEmpty(subLabel)) GUILayout.Label(subLabel, GUILayout.Width(25));
+            value = GUILayout.HorizontalSlider(value, min, max);
+            string valStr = GUILayout.TextField(value.ToString("F3"), GUILayout.Width(60));
+            if (float.TryParse(valStr, out float val))
+            {
+                value = val;
+            }
+            GUILayout.EndHorizontal();
+            return value;
+        }
+
+        private void RenderBoneTree(GameObject go, int indent)
+        {
+            if (go == null) return;
+            
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(indent * 15f);
+            
+            bool hasChildren = go.transform.childCount > 0;
+            bool isExpanded = openedBones.Contains(go);
+            
+            if (hasChildren)
+            {
+                if (GUILayout.Button(isExpanded ? "▼" : "▶", GUI.skin.label, GUILayout.Width(15)))
+                {
+                    if (isExpanded) openedBones.Remove(go);
+                    else openedBones.Add(go);
+                }
+            }
+            else
+            {
+                GUILayout.Space(19);
+            }
+            
+            GUI.color = (selectedBoneTransform == go.transform) ? Color.cyan : Color.white;
+            if (GUILayout.Button(go.name, GUI.skin.label))
+            {
+                selectedBoneTransform = go.transform;
+                if (selectedBoneEdit != null)
+                {
+                    selectedBoneEdit.BoneName = go.name;
+                }
+            }
+            GUI.color = Color.white;
+            
+            GUILayout.EndHorizontal();
+            
+            if (isExpanded && hasChildren)
+            {
+                for (int i = 0; i < go.transform.childCount; i++)
+                {
+                    RenderBoneTree(go.transform.GetChild(i).gameObject, indent + 1);
+                }
+            }
+        }
+
+        private void DrawTransferPopup(int windowId)
+        {
+            GUILayout.Label("Select destination coordinate slot:");
+            
+            for (int i = 0; i < 7; i++) // typically 0 to 6 slots
+            {
+                if (i == ChaControl.fileStatus.coordinateType) continue; // skip current
+                
+                if (GUILayout.Button($"Outfit {i + 1}"))
+                {
+                    TransferSelectedEditsTo(i);
+                    showTransferPopup = false;
+                    transferMode = false;
+                    selectedForTransfer.Clear();
+                }
+            }
+            
+            GUILayout.Space(10);
+            if (GUILayout.Button("Cancel"))
+            {
+                showTransferPopup = false;
+            }
+            
+            UnityEngine.GUI.DragWindow();
+        }
+
+        private void TransferSelectedEditsTo(int destOutfit)
+        {
+            int coord = ChaControl.fileStatus.coordinateType;
+            if (!boneEdits.TryGetValue(coord, out var currentEdits) || currentEdits == null) return;
+            
+            if (!boneEdits.TryGetValue(destOutfit, out var destEdits) || destEdits == null)
+            {
+                destEdits = new List<BoneEffectEdit>();
+                boneEdits[destOutfit] = destEdits;
+            }
+            
+            int nextKey = (destEdits.Count > 0) ? destEdits.Max(e => e.GraphKey) + 1 : 0;
+            
+            int count = 0;
+            foreach (var id in selectedForTransfer)
+            {
+                var edit = currentEdits.FirstOrDefault(e => e.Id == id);
+                if (edit != null)
+                {
+                    var clone = edit.Clone();
+                    clone.GraphKey = nextKey++;
+                    destEdits.Add(clone);
+                    count++;
+                }
+            }
+            
+            AmazingNewBoneLogic.Logger.LogMessage($"Transferred {count} bone edits to Outfit {destOutfit + 1}");
+        }
+
+        private void ExportEdits(List<BoneEffectEdit> edits)
+        {
+            try
+            {
+                var dialog = new System.Windows.Forms.SaveFileDialog
+                {
+                    Filter = "ANBL Bone Edits (*.json)|*.json",
+                    Title = "Export Bone Edits",
+                    FileName = "bone_edits.json"
+                };
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var bytes = MessagePackSerializer.Serialize(edits);
+                    var base64 = Convert.ToBase64String(bytes);
+                    System.IO.File.WriteAllText(dialog.FileName, base64, System.Text.Encoding.UTF8);
+                    AmazingNewBoneLogic.Logger.LogMessage($"Exported {edits.Count} edits to {dialog.FileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AmazingNewBoneLogic.Logger.LogError($"Failed to export edits: {ex}");
+            }
+        }
+
+        private void ImportEdits(List<BoneEffectEdit> currentList)
+        {
+            try
+            {
+                var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    Filter = "ANBL Bone Edits (*.json)|*.json",
+                    Title = "Import Bone Edits"
+                };
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var base64 = System.IO.File.ReadAllText(dialog.FileName);
+                    var bytes = Convert.FromBase64String(base64);
+                    var imported = MessagePackSerializer.Deserialize<List<BoneEffectEdit>>(bytes);
+
+                    if (imported != null)
+                    {
+                        int nextKey = (currentList.Count > 0) ? currentList.Max(e => e.GraphKey) + 1 : 0;
+                        foreach (var edit in imported)
+                        {
+                            edit.Id = Guid.NewGuid().ToString(); // Assign new unique ID to avoid clashes
+                            edit.GraphKey = nextKey++;
+                            currentList.Add(edit);
+                        }
+                        AmazingNewBoneLogic.Logger.LogMessage($"Imported {imported.Count} edits from {dialog.FileName}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AmazingNewBoneLogic.Logger.LogError($"Failed to import edits: {ex}");
+            }
+        }
+
+        private void SyncNamesAndDeletedNodes()
+        {
+            if (lfg == null) return;
+            int coord = ChaControl.fileStatus.coordinateType;
+            if (!boneEdits.TryGetValue(coord, out var edits) || edits == null) return;
+
+            // 1. Sync names from logic graph nodes to bone edits
+            foreach (var node in lfg.getAllNodes().OfType<LogicFlowOutput>())
+            {
+                int graphKey = node.index - 1000000;
+                var edit = edits.FirstOrDefault(e => e.GraphKey == graphKey);
+                if (edit != null)
+                {
+                    if (edit.Name != node.label)
+                    {
+                        edit.Name = node.label;
+                    }
+                }
+            }
+
+            // 2. Delete bone edits if their corresponding output node is deleted in the graph
+            var graphKeys = new HashSet<int>(lfg.getAllNodes().OfType<LogicFlowOutput>().Select(n => n.index - 1000000));
+            for (int i = edits.Count - 1; i >= 0; i--)
+            {
+                var edit = edits[i];
+                if (!graphKeys.Contains(edit.GraphKey))
+                {
+                    edits.RemoveAt(i);
+                    activeBoneEditIds.Remove(edit.Id);
+                    if (selectedBoneEdit == edit) selectedBoneEdit = null;
+                }
+            }
         }
 
         #endregion
