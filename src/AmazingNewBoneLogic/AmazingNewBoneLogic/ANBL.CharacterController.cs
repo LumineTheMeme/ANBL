@@ -1290,6 +1290,11 @@ namespace AmazingNewBoneLogic
             {
                 lfg.setPosition(new Vector2(100, 10));
             }
+            else
+            {
+                simpleWindowRect.x = Mathf.Clamp(simpleWindowRect.x, 0, Mathf.Max(0, Screen.width - simpleWindowRect.width));
+                simpleWindowRect.y = Mathf.Clamp(simpleWindowRect.y, 0, Mathf.Max(0, Screen.height - simpleWindowRect.height));
+            }
 
             if (c != null)
             {
@@ -1645,16 +1650,20 @@ namespace AmazingNewBoneLogic
                                  if (displayBoneEditor)
                                  {
                                      BuildBoneCache();
-                                     float rightPosition = simpleWindowRect.x + simpleWindowRect.width;
-                                     if (rightPosition + boneEditorWindowRect.width <= Screen.width)
+                                     if (!boneEditorPositioned)
                                      {
-                                         boneEditorWindowRect.x = rightPosition;
+                                         float rightPosition = simpleWindowRect.x + simpleWindowRect.width;
+                                         if (rightPosition + boneEditorWindowRect.width <= Screen.width)
+                                         {
+                                             boneEditorWindowRect.x = rightPosition;
+                                         }
+                                         else
+                                         {
+                                             boneEditorWindowRect.x = Mathf.Max(0f, simpleWindowRect.x - boneEditorWindowRect.width);
+                                         }
+                                         boneEditorWindowRect.y = simpleWindowRect.y;
+                                         boneEditorPositioned = true;
                                      }
-                                     else
-                                     {
-                                         boneEditorWindowRect.x = Mathf.Max(0f, simpleWindowRect.x - boneEditorWindowRect.width);
-                                     }
-                                     boneEditorWindowRect.y = simpleWindowRect.y;
                                  }
                              }
                             if (GUILayout.Button("Adv. Mode"))
@@ -3234,6 +3243,7 @@ namespace AmazingNewBoneLogic
         // Bone Editor UI state
         internal bool displayBoneEditor = false;
         private Rect boneEditorWindowRect = new Rect(100, 100, 1000, 600);
+        private bool boneEditorPositioned = false;
         private Vector2 boneListScrollPos = Vector2.zero;
         private Vector2 boneTreeScrollPos = Vector2.zero;
         private Vector2 modifierScrollPos = Vector2.zero;
