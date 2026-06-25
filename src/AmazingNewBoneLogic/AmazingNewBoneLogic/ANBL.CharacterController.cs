@@ -1394,33 +1394,24 @@ namespace AmazingNewBoneLogic
 
         public void SetBoneEditActive(string editId, bool active)
         {
-            bool changed = false;
             if (active)
             {
-                changed = activeBoneEditIds.Add(editId);
+                activeBoneEditIds.Add(editId);
             }
             else
             {
-                changed = activeBoneEditIds.Remove(editId);
-            }
-            if (changed)
-            {
-                var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
-                if (boneController != null)
-                {
-                    boneController.NeedsFullRefresh = true;
-                }
+                activeBoneEditIds.Remove(editId);
             }
         }
 
-        public IEnumerable<string> GetActiveBoneNames()
+        public IEnumerable<string> GetAllConfiguredBoneNames()
         {
             int coord = ChaControl.fileStatus.coordinateType;
             if (!boneEdits.TryGetValue(coord, out var edits) || edits == null)
                 return Enumerable.Empty<string>();
 
             return edits
-                .Where(e => activeBoneEditIds.Contains(e.Id) && !string.IsNullOrEmpty(e.BoneName))
+                .Where(e => !string.IsNullOrEmpty(e.BoneName))
                 .Select(e => e.BoneName)
                 .Distinct();
         }
@@ -3367,6 +3358,8 @@ namespace AmazingNewBoneLogic
                          }
                          list.Clear();
                          selectedBoneEdit = null;
+                         var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                         if (boneController != null) boneController.NeedsFullRefresh = true;
                      };
                      isConfirming = true;
                  }
@@ -3429,6 +3422,8 @@ namespace AmazingNewBoneLogic
                                 lfg.RemoveNode(1000000 + edit.GraphKey);
                                 if (selectedBoneEdit == edit) selectedBoneEdit = null;
                                 i--;
+                                var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                                if (boneController != null) boneController.NeedsFullRefresh = true;
                                 GUILayout.EndHorizontal();
                                 continue;
                             }
@@ -3554,6 +3549,8 @@ namespace AmazingNewBoneLogic
                                 list.Add(newEdit);
                                 selectedBoneEdit = newEdit;
                                 addOutput(newEdit.GraphKey, coord, newEdit.Name);
+                                var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                                if (boneController != null) boneController.NeedsFullRefresh = true;
                             }
                         }
                         GUILayout.FlexibleSpace();
@@ -3946,6 +3943,8 @@ namespace AmazingNewBoneLogic
                             currentList.Add(edit);
                         }
                         AmazingNewBoneLogic.Logger.LogMessage($"Imported {imported.Count} edits from {dialog.FileName}");
+                        var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                        if (boneController != null) boneController.NeedsFullRefresh = true;
                     }
                 }
             }

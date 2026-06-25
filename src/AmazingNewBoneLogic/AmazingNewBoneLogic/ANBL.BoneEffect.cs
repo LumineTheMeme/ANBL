@@ -16,7 +16,7 @@ namespace AmazingNewBoneLogic
         {
             var ctrl = origin.GetComponent<AnblCharaController>();
             if (ctrl == null) return Enumerable.Empty<string>();
-            return ctrl.GetActiveBoneNames();
+            return ctrl.GetAllConfiguredBoneNames();
         }
 
         public override BoneModifierData GetEffect(string bone, BoneController origin, CoordinateType coordinate)
