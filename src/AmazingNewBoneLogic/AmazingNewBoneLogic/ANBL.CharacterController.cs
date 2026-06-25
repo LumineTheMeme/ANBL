@@ -218,6 +218,12 @@ namespace AmazingNewBoneLogic
             activeBoneEditIds.Clear();
             EnsureBoneEffectRegistered();
 
+            var abmxReg = CharacterApi.GetRegisteredBehaviour(typeof(BoneController));
+            if (abmxReg != null && abmxReg.MaintainCoordinateState)
+            {
+                maintainState = true;
+            }
+
             PluginData data = maintainState ? loadedCoordData : GetCoordinateExtendedData(coordinate);
             if (data == null)
             {
