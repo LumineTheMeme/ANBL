@@ -1382,14 +1382,6 @@ namespace AmazingNewBoneLogic
             if (!boneEdits.TryGetValue(coord, out var edits) || edits == null)
                 return Enumerable.Empty<string>();
 
-            if (displayBoneEditor)
-            {
-                return edits
-                    .Where(e => !string.IsNullOrEmpty(e.BoneName))
-                    .Select(e => e.BoneName)
-                    .Distinct();
-            }
-
             return edits
                 .Where(e => activeBoneEditIds.Contains(e.Id) && !string.IsNullOrEmpty(e.BoneName))
                 .Select(e => e.BoneName)
@@ -1402,7 +1394,7 @@ namespace AmazingNewBoneLogic
                 return null;
 
             var activeEdits = edits
-                .Where(e => e.BoneName == bone && (displayBoneEditor || activeBoneEditIds.Contains(e.Id)) && e.Modifier != null)
+                .Where(e => e.BoneName == bone && activeBoneEditIds.Contains(e.Id) && e.Modifier != null)
                 .ToList();
 
             if (activeEdits.Count == 0)
@@ -1641,11 +1633,24 @@ namespace AmazingNewBoneLogic
                             }
 
                             GUILayout.FlexibleSpace();
-                            if (GUILayout.Button("Bone Editor"))
-                            {
-                                displayBoneEditor = !displayBoneEditor;
-                                if (displayBoneEditor) BuildBoneCache();
-                            }
+                             if (GUILayout.Button("Bone Editor"))
+                             {
+                                 displayBoneEditor = !displayBoneEditor;
+                                 if (displayBoneEditor)
+                                 {
+                                     BuildBoneCache();
+                                     float rightPosition = simpleWindowRect.x + simpleWindowRect.width;
+                                     if (rightPosition + boneEditorWindowRect.width <= Screen.width)
+                                     {
+                                         boneEditorWindowRect.x = rightPosition;
+                                     }
+                                     else
+                                     {
+                                         boneEditorWindowRect.x = Mathf.Max(0f, simpleWindowRect.x - boneEditorWindowRect.width);
+                                     }
+                                     boneEditorWindowRect.y = simpleWindowRect.y;
+                                 }
+                             }
                             if (GUILayout.Button("Adv. Mode"))
                             {
                                 confirmRect =
@@ -2572,10 +2577,13 @@ namespace AmazingNewBoneLogic
                     Mathf.Clamp(bEP.y, -bES.y * 0.9f, Screen.height - bES.y * 0.1f)
                 );
                 
+                KKAPI.Utilities.IMGUIUtils.EatInputInRect(boneEditorWindowRect);
+
                 if (showTransferPopup)
                 {
                     transferPopupRect = GUILayout.Window(transferPopupID, transferPopupRect, DrawTransferPopup, "Select Destination Slot", solidSkin.window);
                     GUI.BringWindowToFront(transferPopupID);
+                    KKAPI.Utilities.IMGUIUtils.EatInputInRect(transferPopupRect);
                 }
             }
         }
@@ -3278,7 +3286,28 @@ namespace AmazingNewBoneLogic
             // Column 1: BoneEffect List
             GUILayout.BeginVertical(GUILayout.Width(250));
             {
-                GUILayout.Label("Bone Edits", GUI.skin.box);
+                 GUILayout.BeginHorizontal();
+                 GUILayout.Label("Bone Edits", GUI.skin.box, GUILayout.ExpandWidth(true));
+                 if (GUILayout.Button("Clear", GUILayout.Width(50)))
+                 {
+                     confirmRect = new Rect(
+                         boneEditorWindowRect.position + Event.current.mousePosition - new Vector2(150, 30),
+                         new Vector2(300, 60));
+                     confirmTitle = "Clearing Bone Edits";
+                     confirmText = "ALL bone effect definitions will be erased!";
+                     onConfirm = () =>
+                     {
+                         foreach (var edit in list)
+                         {
+                             lfg.RemoveNode(1000000 + edit.GraphKey);
+                             activeBoneEditIds.Remove(edit.Id);
+                         }
+                         list.Clear();
+                         selectedBoneEdit = null;
+                     };
+                     isConfirming = true;
+                 }
+                 GUILayout.EndHorizontal();
                 
                 // Search bar
                 GUILayout.BeginHorizontal();
@@ -3287,11 +3316,7 @@ namespace AmazingNewBoneLogic
                 GUILayout.EndHorizontal();
 
                 // Delete/Transfer mode prompt/buttons
-                if (deleteMode)
-                {
-                    GUILayout.Label("DELETE MODE: Select edits", GUI.skin.box);
-                }
-                else if (transferMode)
+                if (transferMode)
                 {
                     GUILayout.Label("TRANSFER MODE: Select edits", GUI.skin.box);
                 }
@@ -3310,7 +3335,7 @@ namespace AmazingNewBoneLogic
 
                         GUILayout.BeginHorizontal();
                         
-                        if (deleteMode || transferMode)
+                        if (transferMode)
                         {
                             bool isSelected = selectedForTransfer.Contains(edit.Id);
                             if (GUILayout.Toggle(isSelected, "", GUILayout.Width(20)))
@@ -3331,8 +3356,8 @@ namespace AmazingNewBoneLogic
                         }
                         GUI.color = Color.white;
 
-                        // Quick X button (only in normal mode)
-                        if (!deleteMode && !transferMode)
+                        // Quick X button (only when deleteMode is true)
+                        if (deleteMode)
                         {
                             if (GUILayout.Button("X", GUILayout.Width(25), GUILayout.Height(30)))
                             {
@@ -3353,33 +3378,7 @@ namespace AmazingNewBoneLogic
 
                 // Column 1 Bottom Buttons
                 GUILayout.Space(5);
-                if (deleteMode)
-                {
-                    GUILayout.BeginHorizontal();
-                    if (GUILayout.Button("Cancel"))
-                    {
-                        deleteMode = false;
-                        selectedForTransfer.Clear();
-                    }
-                    if (GUILayout.Button("Delete Selected"))
-                    {
-                        foreach (var id in selectedForTransfer)
-                        {
-                            var edit = list.FirstOrDefault(x => x.Id == id);
-                            if (edit != null)
-                            {
-                                lfg.RemoveNode(1000000 + edit.GraphKey);
-                                activeBoneEditIds.Remove(edit.Id);
-                            }
-                        }
-                        list.RemoveAll(x => selectedForTransfer.Contains(x.Id));
-                        deleteMode = false;
-                        selectedForTransfer.Clear();
-                        selectedBoneEdit = null;
-                    }
-                    GUILayout.EndHorizontal();
-                }
-                else if (transferMode)
+                if (transferMode)
                 {
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button("Cancel"))
@@ -3401,11 +3400,14 @@ namespace AmazingNewBoneLogic
                     if (GUILayout.Button("Import")) ImportEdits(list);
                     GUILayout.EndHorizontal();
                     GUILayout.BeginHorizontal();
-                    if (GUILayout.Button("Delete"))
+                    
+                    GUI.color = deleteMode ? Color.red : Color.white;
+                    if (GUILayout.Button(deleteMode ? "Done" : "Delete"))
                     {
-                        deleteMode = true;
-                        selectedForTransfer.Clear();
+                        deleteMode = !deleteMode;
                     }
+                    GUI.color = Color.white;
+
                     if (GUILayout.Button("Transfer"))
                     {
                         transferMode = true;
@@ -3444,10 +3446,7 @@ namespace AmazingNewBoneLogic
                             if (GUILayout.Button(t.name, GUI.skin.label))
                             {
                                 selectedBoneTransform = t;
-                                if (selectedBoneEdit != null)
-                                {
-                                    selectedBoneEdit.BoneName = t.name;
-                                }
+                                selectedBoneEdit = null;
                             }
                             GUI.color = Color.white;
                             GUILayout.EndHorizontal();
@@ -3483,12 +3482,23 @@ namespace AmazingNewBoneLogic
                             if (GUILayout.Button($"Create new bone edit for\n{selectedBoneTransform.name}", GUILayout.Height(55)))
                             {
                                 int nextKey = (list.Count > 0) ? list.Max(e => e.GraphKey) + 1 : 0;
+                                string baseName = selectedBoneTransform.name;
+                                string proposedName = baseName;
+                                int suffix = 2;
+                                while (list.Any(e => e.Name.Equals(proposedName, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    proposedName = $"{baseName} {suffix}";
+                                    suffix++;
+                                }
+
                                 var newEdit = new BoneEffectEdit(selectedBoneTransform.name)
                                 {
+                                    Name = proposedName,
                                     GraphKey = nextKey
                                 };
                                 list.Add(newEdit);
                                 selectedBoneEdit = newEdit;
+                                addOutput(newEdit.GraphKey, coord, newEdit.Name);
                             }
                         }
                         GUILayout.FlexibleSpace();
@@ -3507,10 +3517,10 @@ namespace AmazingNewBoneLogic
                         GUILayout.Label("Modifiers", GUI.skin.label);
 
                         var mod = selectedBoneEdit.Modifier;
-                        mod.ScaleModifier = DrawVector3Sliders("Scale", mod.ScaleModifier, 0.0f, 5.0f, 1.0f);
-                        mod.LengthModifier = DrawSingleSlider("Length", mod.LengthModifier, 0.0f, 5.0f, 1.0f);
-                        mod.PositionModifier = DrawVector3Sliders("Position", mod.PositionModifier, -10.0f, 10.0f, 0.0f);
-                        mod.RotationModifier = DrawVector3Sliders("Rotation", mod.RotationModifier, -360.0f, 360.0f, 0.0f);
+                        mod.ScaleModifier = DrawVector3Sliders("Scale", mod.ScaleModifier, 0.0f, 5.0f, 1.0f, ref stepSizeScale, ref stepSizeScaleStr, ref linkScale);
+                        mod.LengthModifier = DrawSingleSlider("Length", mod.LengthModifier, 0.0f, 5.0f, 1.0f, ref stepSizeLength, ref stepSizeLengthStr);
+                        mod.PositionModifier = DrawVector3Sliders("Position", mod.PositionModifier, -10.0f, 10.0f, 0.0f, ref stepSizePosition, ref stepSizePositionStr, ref linkPosition);
+                        mod.RotationModifier = DrawVector3Sliders("Rotation", mod.RotationModifier, -360.0f, 360.0f, 0.0f, ref stepSizeRotation, ref stepSizeRotationStr, ref linkRotation);
 
                         GUILayout.Space(15);
                         GUILayout.BeginHorizontal();
@@ -3524,11 +3534,6 @@ namespace AmazingNewBoneLogic
                         }
                         GUILayout.EndHorizontal();
 
-                        GUILayout.Space(10);
-                        if (GUILayout.Button("Add Bone Edit to Logic Editor", GUILayout.Height(40)))
-                        {
-                            addOutput(selectedBoneEdit.GraphKey, coord, selectedBoneEdit.Name);
-                        }
                     }
                 }
                 GUILayout.EndScrollView();
@@ -3536,54 +3541,133 @@ namespace AmazingNewBoneLogic
             GUILayout.EndVertical();
 
             GUILayout.EndHorizontal();
+
+            UnityEngine.GUI.DragWindow();
         }
 
-        private Vector3 DrawVector3Sliders(string label, Vector3 value, float min, float max, float def)
+        private float stepSizeScale = 0.01f;
+        private string stepSizeScaleStr = "0.01";
+        private bool linkScale = false;
+        private float stepSizeLength = 0.01f;
+        private string stepSizeLengthStr = "0.01";
+        private float stepSizePosition = 0.01f;
+        private string stepSizePositionStr = "0.01";
+        private bool linkPosition = false;
+        private float stepSizeRotation = 1.0f;
+        private string stepSizeRotationStr = "1";
+        private bool linkRotation = false;
+
+        private Vector3 DrawVector3Sliders(string label, Vector3 value, float min, float max, float def, ref float stepSize, ref string stepSizeStr, ref bool linkMode)
         {
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.BeginHorizontal();
             GUILayout.Label(label, GUILayout.Width(70));
+            
+            GUILayout.Label("Step:", GUILayout.Width(35));
+            stepSizeStr = GUILayout.TextField(stepSizeStr, GUILayout.Width(40));
+            if (float.TryParse(stepSizeStr, out float parsedStep)) stepSize = parsedStep;
+            
+            if (GUILayout.Button("-", GUILayout.Width(20))) 
+            {
+                stepSize /= 10f;
+                stepSizeStr = stepSize.ToString("G");
+            }
+            if (GUILayout.Button("+", GUILayout.Width(20)))
+            {
+                stepSize *= 10f;
+                stepSizeStr = stepSize.ToString("G");
+            }
+            
+            GUILayout.FlexibleSpace();
+            
+            GUI.color = linkMode ? Color.yellow : Color.white;
+            if (GUILayout.Button("Link", GUILayout.Width(45)))
+            {
+                linkMode = !linkMode;
+            }
+            GUI.color = Color.white;
+            
             if (GUILayout.Button("Reset", GUILayout.Width(50)))
             {
                 value = new Vector3(def, def, def);
             }
             GUILayout.EndHorizontal();
 
-            value.x = DrawSliderRow("  X", value.x, min, max);
-            value.y = DrawSliderRow("  Y", value.y, min, max);
-            value.z = DrawSliderRow("  Z", value.z, min, max);
+            float oldX = value.x;
+            float oldY = value.y;
+            float oldZ = value.z;
+
+            value.x = DrawSliderRow("  X", value.x, min, max, stepSize, def, linkMode);
+            value.y = DrawSliderRow("  Y", value.y, min, max, stepSize, def, linkMode);
+            value.z = DrawSliderRow("  Z", value.z, min, max, stepSize, def, linkMode);
+
+            if (linkMode)
+            {
+                if (value.x != oldX) value = new Vector3(value.x, value.x, value.x);
+                else if (value.y != oldY) value = new Vector3(value.y, value.y, value.y);
+                else if (value.z != oldZ) value = new Vector3(value.z, value.z, value.z);
+            }
 
             GUILayout.EndVertical();
             return value;
         }
 
-        private float DrawSingleSlider(string label, float value, float min, float max, float def)
+        private float DrawSingleSlider(string label, float value, float min, float max, float def, ref float stepSize, ref string stepSizeStr)
         {
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.BeginHorizontal();
             GUILayout.Label(label, GUILayout.Width(70));
+            
+            GUILayout.Label("Step:", GUILayout.Width(35));
+            stepSizeStr = GUILayout.TextField(stepSizeStr, GUILayout.Width(40));
+            if (float.TryParse(stepSizeStr, out float parsedStep)) stepSize = parsedStep;
+            
+            if (GUILayout.Button("-", GUILayout.Width(20))) 
+            {
+                stepSize /= 10f;
+                stepSizeStr = stepSize.ToString("G");
+            }
+            if (GUILayout.Button("+", GUILayout.Width(20)))
+            {
+                stepSize *= 10f;
+                stepSizeStr = stepSize.ToString("G");
+            }
+            
+            GUILayout.FlexibleSpace();
+            
             if (GUILayout.Button("Reset", GUILayout.Width(50)))
             {
                 value = def;
             }
             GUILayout.EndHorizontal();
 
-            value = DrawSliderRow("", value, min, max);
+            value = DrawSliderRow("", value, min, max, stepSize, def, false);
 
             GUILayout.EndVertical();
             return value;
         }
 
-        private float DrawSliderRow(string subLabel, float value, float min, float max)
+        private float DrawSliderRow(string subLabel, float value, float min, float max, float stepSize, float def, bool isLinked)
         {
             GUILayout.BeginHorizontal();
+            
+            if (isLinked) GUI.contentColor = Color.yellow;
             if (!string.IsNullOrEmpty(subLabel)) GUILayout.Label(subLabel, GUILayout.Width(25));
+            if (isLinked) GUI.contentColor = Color.white;
+            
             value = GUILayout.HorizontalSlider(value, min, max);
-            string valStr = GUILayout.TextField(value.ToString("F3"), GUILayout.Width(60));
+            
+            string valStr = GUILayout.TextField(value.ToString("F3"), GUILayout.Width(50));
             if (float.TryParse(valStr, out float val))
             {
                 value = val;
             }
+            
+            if (GUILayout.Button("-", GUILayout.Width(20))) value -= stepSize;
+            if (GUILayout.Button("+", GUILayout.Width(20))) value += stepSize;
+            
+            if (GUILayout.Button(def.ToString("G"), GUILayout.Width(25))) value = def;
+            
             GUILayout.EndHorizontal();
             return value;
         }
@@ -3615,10 +3699,7 @@ namespace AmazingNewBoneLogic
             if (GUILayout.Button(go.name, GUI.skin.label))
             {
                 selectedBoneTransform = go.transform;
-                if (selectedBoneEdit != null)
-                {
-                    selectedBoneEdit.BoneName = go.name;
-                }
+                selectedBoneEdit = null;
             }
             GUI.color = Color.white;
             
@@ -3768,18 +3849,8 @@ namespace AmazingNewBoneLogic
                 }
             }
 
-            // 2. Delete bone edits if their corresponding output node is deleted in the graph
-            var graphKeys = new HashSet<int>(lfg.getAllNodes().OfType<LogicFlowOutput>().Select(n => n.index - 1000000));
-            for (int i = edits.Count - 1; i >= 0; i--)
-            {
-                var edit = edits[i];
-                if (!graphKeys.Contains(edit.GraphKey))
-                {
-                    edits.RemoveAt(i);
-                    activeBoneEditIds.Remove(edit.Id);
-                    if (selectedBoneEdit == edit) selectedBoneEdit = null;
-                }
-            }
+            // 2. We no longer auto-delete bone edits here to prevent immediate deletion upon creation.
+            // Users must delete bone edits manually using the Bone Editor UI.
         }
 
         #endregion
