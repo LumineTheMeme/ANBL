@@ -1650,20 +1650,7 @@ namespace AmazingNewBoneLogic
                                  if (displayBoneEditor)
                                  {
                                      BuildBoneCache();
-                                     if (!boneEditorPositioned)
-                                     {
-                                         float rightPosition = simpleWindowRect.x + simpleWindowRect.width;
-                                         if (rightPosition + boneEditorWindowRect.width <= Screen.width)
-                                         {
-                                             boneEditorWindowRect.x = rightPosition;
-                                         }
-                                         else
-                                         {
-                                             boneEditorWindowRect.x = Mathf.Max(0f, simpleWindowRect.x - boneEditorWindowRect.width);
-                                         }
-                                         boneEditorWindowRect.y = simpleWindowRect.y;
-                                         boneEditorPositioned = true;
-                                     }
+                                     TryPositionBoneEditorWindow();
                                  }
                              }
                             if (GUILayout.Button("Adv. Mode"))
@@ -1724,6 +1711,7 @@ namespace AmazingNewBoneLogic
                                     {
                                         displayBoneEditor = true;
                                         BuildBoneCache();
+                                        TryPositionBoneEditorWindow();
                                     }
                                 }
                                 else
@@ -3244,6 +3232,24 @@ namespace AmazingNewBoneLogic
         internal bool displayBoneEditor = false;
         private Rect boneEditorWindowRect = new Rect(100, 100, 1000, 600);
         private bool boneEditorPositioned = false;
+
+        private void TryPositionBoneEditorWindow()
+        {
+            if (!boneEditorPositioned)
+            {
+                float rightPosition = simpleWindowRect.x + simpleWindowRect.width;
+                if (rightPosition + boneEditorWindowRect.width <= Screen.width)
+                {
+                    boneEditorWindowRect.x = rightPosition;
+                }
+                else
+                {
+                    boneEditorWindowRect.x = Mathf.Max(0f, simpleWindowRect.x - boneEditorWindowRect.width);
+                }
+                boneEditorWindowRect.y = simpleWindowRect.y;
+                boneEditorPositioned = true;
+            }
+        }
         private Vector2 boneListScrollPos = Vector2.zero;
         private Vector2 boneTreeScrollPos = Vector2.zero;
         private Vector2 modifierScrollPos = Vector2.zero;
