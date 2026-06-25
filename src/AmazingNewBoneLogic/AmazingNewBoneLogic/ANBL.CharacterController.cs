@@ -3631,8 +3631,8 @@ namespace AmazingNewBoneLogic
             }
         }
 
-        private float stepSizeScale = 0.01f;
-        private string stepSizeScaleStr = "0.01";
+        private float stepSizeScale = 0.1f;
+        private string stepSizeScaleStr = "0.1";
         private bool linkScale = false;
         private float stepSizeLength = 0.01f;
         private string stepSizeLengthStr = "0.01";
@@ -3655,13 +3655,31 @@ namespace AmazingNewBoneLogic
             
             if (GUILayout.Button("-", GUILayout.Width(18))) 
             {
-                stepSize /= 10f;
-                stepSizeStr = stepSize.ToString("G");
+                if (decimal.TryParse(stepSizeStr, out decimal decStep) && decStep > 0m)
+                {
+                    decStep /= 10m;
+                    stepSize = (float)decStep;
+                    stepSizeStr = decStep.ToString("G");
+                }
+                else
+                {
+                    stepSize /= 10f;
+                    stepSizeStr = stepSize.ToString("G");
+                }
             }
             if (GUILayout.Button("+", GUILayout.Width(18)))
             {
-                stepSize *= 10f;
-                stepSizeStr = stepSize.ToString("G");
+                if (decimal.TryParse(stepSizeStr, out decimal decStep))
+                {
+                    decStep *= 10m;
+                    stepSize = (float)decStep;
+                    stepSizeStr = decStep.ToString("G");
+                }
+                else
+                {
+                    stepSize *= 10f;
+                    stepSizeStr = stepSize.ToString("G");
+                }
             }
             
             GUILayout.FlexibleSpace();
@@ -3710,13 +3728,31 @@ namespace AmazingNewBoneLogic
             
             if (GUILayout.Button("-", GUILayout.Width(18))) 
             {
-                stepSize /= 10f;
-                stepSizeStr = stepSize.ToString("G");
+                if (decimal.TryParse(stepSizeStr, out decimal decStep) && decStep > 0m)
+                {
+                    decStep /= 10m;
+                    stepSize = (float)decStep;
+                    stepSizeStr = decStep.ToString("G");
+                }
+                else
+                {
+                    stepSize /= 10f;
+                    stepSizeStr = stepSize.ToString("G");
+                }
             }
             if (GUILayout.Button("+", GUILayout.Width(18)))
             {
-                stepSize *= 10f;
-                stepSizeStr = stepSize.ToString("G");
+                if (decimal.TryParse(stepSizeStr, out decimal decStep))
+                {
+                    decStep *= 10m;
+                    stepSize = (float)decStep;
+                    stepSizeStr = decStep.ToString("G");
+                }
+                else
+                {
+                    stepSize *= 10f;
+                    stepSizeStr = stepSize.ToString("G");
+                }
             }
             
             GUILayout.FlexibleSpace();
