@@ -1331,6 +1331,8 @@ namespace AmazingNewBoneLogic
         public void Hide()
         {
             displayGraph = false;
+            displayBoneEditor = false;
+            UpdateHighlight(null);
             if (MakerAPI.InsideAndLoaded) AmazingNewBoneLogic.SidebarToggle.Value = false;
             AnblCameraComponent acc = rCam.GetComponent<AnblCameraComponent>();
             if (acc != null) acc.OnPostRenderEvent -= postRenderEvent;
@@ -3656,12 +3658,12 @@ namespace AmazingNewBoneLogic
                 {
                     decStep /= 10m;
                     stepSize = (float)decStep;
-                    stepSizeStr = decStep.ToString("G");
+                    stepSizeStr = decStep.ToString("0.############################");
                 }
                 else
                 {
                     stepSize /= 10f;
-                    stepSizeStr = stepSize.ToString("G");
+                    stepSizeStr = stepSize.ToString("0.######");
                 }
             }
             if (GUILayout.Button("+", GUILayout.Width(18)))
@@ -3670,12 +3672,12 @@ namespace AmazingNewBoneLogic
                 {
                     decStep *= 10m;
                     stepSize = (float)decStep;
-                    stepSizeStr = decStep.ToString("G");
+                    stepSizeStr = decStep.ToString("0.############################");
                 }
                 else
                 {
                     stepSize *= 10f;
-                    stepSizeStr = stepSize.ToString("G");
+                    stepSizeStr = stepSize.ToString("0.######");
                 }
             }
             
@@ -3729,12 +3731,12 @@ namespace AmazingNewBoneLogic
                 {
                     decStep /= 10m;
                     stepSize = (float)decStep;
-                    stepSizeStr = decStep.ToString("G");
+                    stepSizeStr = decStep.ToString("0.############################");
                 }
                 else
                 {
                     stepSize /= 10f;
-                    stepSizeStr = stepSize.ToString("G");
+                    stepSizeStr = stepSize.ToString("0.######");
                 }
             }
             if (GUILayout.Button("+", GUILayout.Width(18)))
@@ -3743,12 +3745,12 @@ namespace AmazingNewBoneLogic
                 {
                     decStep *= 10m;
                     stepSize = (float)decStep;
-                    stepSizeStr = decStep.ToString("G");
+                    stepSizeStr = decStep.ToString("0.############################");
                 }
                 else
                 {
                     stepSize *= 10f;
-                    stepSizeStr = stepSize.ToString("G");
+                    stepSizeStr = stepSize.ToString("0.######");
                 }
             }
             
