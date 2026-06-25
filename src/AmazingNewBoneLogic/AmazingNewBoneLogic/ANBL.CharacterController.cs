@@ -589,6 +589,9 @@ namespace AmazingNewBoneLogic
                 case AdvancedInputType.Accessory:
                     node = addAdvancedInputAccessory((int)sNode.data2[1], sNode.position, outfit, sNode.index);
                     break;
+                case AdvancedInputType.AlwaysOn:
+                    node = addAdvancedInputAlwaysOn(sNode.position, outfit, sNode.index);
+                    break;
             }
 
             return node;
@@ -1154,6 +1157,29 @@ namespace AmazingNewBoneLogic
 
             if (!serialisationData.ContainsKey(g)) serialisationData.Add(g, new Dictionary<int, List<object>>());
             serialisationData[g].Add(node.index, new List<object> { AdvancedInputType.EyebrowPtn, pattern });
+
+            return node;
+        }
+
+        public LogicFlowNode addAdvancedInputAlwaysOn(Vector2 pos, int? outfit = null, int? index = null)
+        {
+            LogicFlowGraph g;
+            if (!outfit.HasValue) g = lfg;
+            else g = graphs[outfit.Value];
+            if (g == null) return null;
+
+            LogicFlowInput_Func node = new LogicFlowInput_Func(() => true, g, index)
+                { label = "Always On" };
+
+            if (node != null)
+            {
+                node.setPosition(pos);
+                node.toolTipText = "Always On";
+                node.deletable = true;
+            }
+
+            if (!serialisationData.ContainsKey(g)) serialisationData.Add(g, new Dictionary<int, List<object>>());
+            serialisationData[g].Add(node.index, new List<object> { AdvancedInputType.AlwaysOn });
 
             return node;
         }
@@ -2694,6 +2720,16 @@ namespace AmazingNewBoneLogic
             advanceInputWindowScroll = GUILayout.BeginScrollView(advanceInputWindowScroll);
             GUILayout.BeginVertical();
 
+            #region Always On Input
+
+            GUILayout.Label("Always On", labelStyle);
+            if (GUILayout.Button("Add Always On Input", buttonStyleGreen))
+            {
+                addAdvancedInputAlwaysOn(lfg.getSize() / 2);
+            }
+            GUILayout.Space(15);
+
+            #endregion
 
             #region Hand Pattern Input
 
@@ -3230,7 +3266,7 @@ namespace AmazingNewBoneLogic
 
         // Bone Editor UI state
         internal bool displayBoneEditor = false;
-        private Rect boneEditorWindowRect = new Rect(100, 100, 1000, 600);
+        private Rect boneEditorWindowRect = new Rect(100, 100, 870, 600);
         private bool boneEditorPositioned = false;
 
         private void TryPositionBoneEditorWindow()
@@ -3448,7 +3484,7 @@ namespace AmazingNewBoneLogic
             GUILayout.Box("", GUILayout.Width(2), GUILayout.ExpandHeight(true)); // separator
 
             // Column 2: Collapsible Bone Tree
-            GUILayout.BeginVertical(GUILayout.Width(350));
+            GUILayout.BeginVertical(GUILayout.Width(308));
             {
                 GUILayout.Label("Bone Hierarchy", GUI.skin.box);
                 
@@ -3486,7 +3522,7 @@ namespace AmazingNewBoneLogic
             GUILayout.Box("", GUILayout.Width(2), GUILayout.ExpandHeight(true)); // separator
 
             // Column 3: Modifier Sliders
-            GUILayout.BeginVertical(GUILayout.Width(400));
+            GUILayout.BeginVertical(GUILayout.Width(312));
             {
                 GUILayout.Label("Modifications", GUI.skin.box);
                 modifierScrollPos = GUILayout.BeginScrollView(modifierScrollPos, GUILayout.ExpandHeight(true));
@@ -3611,18 +3647,18 @@ namespace AmazingNewBoneLogic
         {
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.BeginHorizontal();
-            GUILayout.Label(label, GUILayout.Width(70));
+            GUILayout.Label(label, GUILayout.Width(55));
             
-            GUILayout.Label("Step:", GUILayout.Width(35));
+            GUILayout.Label("Step", GUILayout.Width(30));
             stepSizeStr = GUILayout.TextField(stepSizeStr, GUILayout.Width(40));
             if (float.TryParse(stepSizeStr, out float parsedStep)) stepSize = parsedStep;
             
-            if (GUILayout.Button("-", GUILayout.Width(20))) 
+            if (GUILayout.Button("-", GUILayout.Width(18))) 
             {
                 stepSize /= 10f;
                 stepSizeStr = stepSize.ToString("G");
             }
-            if (GUILayout.Button("+", GUILayout.Width(20)))
+            if (GUILayout.Button("+", GUILayout.Width(18)))
             {
                 stepSize *= 10f;
                 stepSizeStr = stepSize.ToString("G");
@@ -3631,13 +3667,13 @@ namespace AmazingNewBoneLogic
             GUILayout.FlexibleSpace();
             
             GUI.color = linkMode ? Color.yellow : Color.white;
-            if (GUILayout.Button("Link", GUILayout.Width(45)))
+            if (GUILayout.Button("Link", GUILayout.Width(38)))
             {
                 linkMode = !linkMode;
             }
             GUI.color = Color.white;
             
-            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            if (GUILayout.Button("Reset", GUILayout.Width(45)))
             {
                 value = new Vector3(def, def, def);
             }
@@ -3666,18 +3702,18 @@ namespace AmazingNewBoneLogic
         {
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.BeginHorizontal();
-            GUILayout.Label(label, GUILayout.Width(70));
+            GUILayout.Label(label, GUILayout.Width(55));
             
-            GUILayout.Label("Step:", GUILayout.Width(35));
+            GUILayout.Label("Step", GUILayout.Width(30));
             stepSizeStr = GUILayout.TextField(stepSizeStr, GUILayout.Width(40));
             if (float.TryParse(stepSizeStr, out float parsedStep)) stepSize = parsedStep;
             
-            if (GUILayout.Button("-", GUILayout.Width(20))) 
+            if (GUILayout.Button("-", GUILayout.Width(18))) 
             {
                 stepSize /= 10f;
                 stepSizeStr = stepSize.ToString("G");
             }
-            if (GUILayout.Button("+", GUILayout.Width(20)))
+            if (GUILayout.Button("+", GUILayout.Width(18)))
             {
                 stepSize *= 10f;
                 stepSizeStr = stepSize.ToString("G");
@@ -3685,7 +3721,7 @@ namespace AmazingNewBoneLogic
             
             GUILayout.FlexibleSpace();
             
-            if (GUILayout.Button("Reset", GUILayout.Width(50)))
+            if (GUILayout.Button("Reset", GUILayout.Width(45)))
             {
                 value = def;
             }
@@ -3702,21 +3738,21 @@ namespace AmazingNewBoneLogic
             GUILayout.BeginHorizontal();
             
             if (isLinked) GUI.contentColor = Color.yellow;
-            if (!string.IsNullOrEmpty(subLabel)) GUILayout.Label(subLabel, GUILayout.Width(25));
+            if (!string.IsNullOrEmpty(subLabel)) GUILayout.Label(subLabel, GUILayout.Width(20));
             if (isLinked) GUI.contentColor = Color.white;
             
-            value = GUILayout.HorizontalSlider(value, min, max);
+            value = GUILayout.HorizontalSlider(value, min, max, GUILayout.MinWidth(40), GUILayout.MaxWidth(200));
             
-            string valStr = GUILayout.TextField(value.ToString("F3"), GUILayout.Width(50));
+            string valStr = GUILayout.TextField(value.ToString("F3"), GUILayout.Width(45));
             if (float.TryParse(valStr, out float val))
             {
                 value = val;
             }
             
-            if (GUILayout.Button("-", GUILayout.Width(20))) value -= stepSize;
-            if (GUILayout.Button("+", GUILayout.Width(20))) value += stepSize;
+            if (GUILayout.Button("-", GUILayout.Width(18))) value -= stepSize;
+            if (GUILayout.Button("+", GUILayout.Width(18))) value += stepSize;
             
-            if (GUILayout.Button(def.ToString("G"), GUILayout.Width(25))) value = def;
+            if (GUILayout.Button(def.ToString("G"), GUILayout.Width(22))) value = def;
             
             GUILayout.EndHorizontal();
             return value;
@@ -3945,6 +3981,7 @@ namespace AmazingNewBoneLogic
         EyesOpn,
         MouthPtn,
         MouthOpn,
-        EyebrowPtn
+        EyebrowPtn,
+        AlwaysOn
     }
 }
