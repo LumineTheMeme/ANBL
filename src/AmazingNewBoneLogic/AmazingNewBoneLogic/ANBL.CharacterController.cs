@@ -3462,15 +3462,7 @@ namespace AmazingNewBoneLogic
                         
                         foreach (var t in matchingBones)
                         {
-                            GUILayout.BeginHorizontal();
-                            GUI.color = (selectedBoneTransform == t) ? Color.cyan : Color.white;
-                            if (GUILayout.Button(t.name, GUI.skin.label))
-                            {
-                                selectedBoneTransform = t;
-                                selectedBoneEdit = null;
-                            }
-                            GUI.color = Color.white;
-                            GUILayout.EndHorizontal();
+                            RenderBoneTree(t.gameObject, 0);
                         }
                     }
                     else
