@@ -3839,6 +3839,8 @@ namespace AmazingNewBoneLogic
             }
         }
 
+        private bool copyBoneLogicOnTransfer = true;
+
         private void DrawTransferPopup(int windowId)
         {
             GUILayout.Label("Select destination coordinate slot:");
@@ -3855,6 +3857,9 @@ namespace AmazingNewBoneLogic
                     selectedForTransfer.Clear();
                 }
             }
+            
+            GUILayout.Space(10);
+            copyBoneLogicOnTransfer = GUILayout.Toggle(copyBoneLogicOnTransfer, "Copy Bone Logic");
             
             GUILayout.Space(10);
             if (GUILayout.Button("Cancel"))
@@ -3878,6 +3883,24 @@ namespace AmazingNewBoneLogic
             
             int nextKey = (destEdits.Count > 0) ? destEdits.Max(e => e.GraphKey) + 1 : 0;
             
+            LogicFlows.LogicFlowGraph srcGraph = null;
+            LogicFlows.LogicFlowGraph dstGraph = null;
+            GraphData srcData = null;
+            GraphData dstData = null;
+
+            if (copyBoneLogicOnTransfer)
+            {
+                if (!graphs.ContainsKey(coord)) createGraph(coord);
+                if (!graphs.ContainsKey(destOutfit)) createGraph(destOutfit);
+                
+                srcGraph = graphs[coord];
+                dstGraph = graphs[destOutfit];
+                srcData = graphData[srcGraph];
+                dstData = graphData[dstGraph];
+                
+                dstGraph.isLoading = true;
+            }
+
             int count = 0;
             foreach (var id in selectedForTransfer)
             {
@@ -3885,10 +3908,72 @@ namespace AmazingNewBoneLogic
                 if (edit != null)
                 {
                     var clone = edit.Clone();
-                    clone.GraphKey = nextKey++;
+                    int srcKey = clone.GraphKey;
+                    int dstKey = nextKey++;
+                    clone.GraphKey = dstKey;
                     destEdits.Add(clone);
                     count++;
+
+                    if (copyBoneLogicOnTransfer && srcGraph != null && dstGraph != null)
+                    {
+                        int srcIdxSlot = srcKey + 1000000;
+                        int dstIdxSlot = dstKey + 1000000;
+                        
+                        if (dstGraph.getNodeAt(dstIdxSlot) != null)
+                        {
+                            dstData.PurgeNode(dstGraph.getNodeAt(dstIdxSlot));
+                            dstGraph.RemoveNode(dstIdxSlot);
+                        }
+
+                        LogicFlows.LogicFlowOutput sOutput = srcGraph.getNodeAt(srcIdxSlot) as LogicFlows.LogicFlowOutput;
+                        if (sOutput != null)
+                        {
+                            var sNode = SerialisedNode.Serialise(sOutput, srcGraph);
+                            sNode.index = dstIdxSlot;
+                            deserialiseNode(saveVersion, destOutfit, sNode);
+
+                            List<int> iTree = sOutput.getInputTree();
+                            foreach (int index in iTree)
+                            {
+                                LogicFlows.LogicFlowNode node = dstGraph.getNodeAt(index);
+                                if (node == null)
+                                {
+                                    var srcNode = srcGraph.getNodeAt(index);
+                                    deserialiseNode(saveVersion, destOutfit, SerialisedNode.Serialise(srcNode, srcGraph));
+                                    
+                                    if (srcNode is LogicFlowNode_GRP)
+                                    {
+                                        var dstNode = (LogicFlowNode_GRP)dstGraph.getNodeAt(index);
+                                        var toRemove = new List<int>();
+                                        foreach (var set in dstNode.controlledNodes)
+                                        {
+                                            foreach (var idx in set.Value)
+                                            {
+                                                if (dstGraph.getNodeAt(idx) == null)
+                                                {
+                                                    toRemove.Add(idx);
+                                                }
+                                            }
+                                            foreach (var idx in toRemove)
+                                            {
+                                                dstNode.controlledNodes[set.Key].Remove(idx);
+                                            }
+                                            toRemove.Clear();
+                                            dstNode.setName(dstNode.getName());
+                                        }
+                                    }
+                                }
+                            }
+                            GraphData.CopyAccData(srcKey, srcData, dstKey, dstData);
+                        }
+                    }
                 }
+            }
+
+            if (copyBoneLogicOnTransfer && dstGraph != null)
+            {
+                dstData.MakeGraph();
+                dstGraph.isLoading = false;
             }
             
             AmazingNewBoneLogic.Logger.LogMessage($"Transferred {count} bone edits to Outfit {destOutfit + 1}");
