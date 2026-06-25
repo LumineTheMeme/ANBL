@@ -46,10 +46,6 @@ namespace AmazingNewBoneLogic
         private Dictionary<LogicFlowGraph, GraphData> graphData = new Dictionary<LogicFlowGraph, GraphData>();
         internal Dictionary<int, LogicFlowGraph> graphs = new Dictionary<int, LogicFlowGraph>();
         internal Dictionary<int, List<BoneEffectEdit>> boneEdits = new Dictionary<int, List<BoneEffectEdit>>();
-
-        internal bool displayGraph = false;
-        internal bool _lastModeWasAdvanced = false;
-        private bool lastCoordHadANBL = false;
         internal HashSet<string> activeBoneEditIds = new HashSet<string>();
         private ANBLBoneEffect _boneEffect;
 
@@ -58,6 +54,8 @@ namespace AmazingNewBoneLogic
         private static bool _highlightBonesMethodSearched = false;
         private static System.Reflection.MethodInfo _highlightBonesMethod = null;
 
+        internal bool displayGraph = false;
+        private bool lastCoordHadANBL = false;
         private static Material mat = new Material(Shader.Find("Hidden/Internal-Colored"));
 
         public PluginData loadedCardData = null;
@@ -172,35 +170,24 @@ namespace AmazingNewBoneLogic
         protected override void OnCoordinateBeingSaved(ChaFileCoordinate coordinate)
         {
             base.OnCoordinateBeingSaved(coordinate);
-            int coord = Array.IndexOf(ChaControl.chaFile.coordinate, coordinate);
-            if (coord == -1) coord = ChaControl.fileStatus.coordinateType;
-            UpdateCoordinateExtendedData(coord, coordinate);
-        }
 
-        private void UpdateCoordinateExtendedData(int outfit, ChaFileCoordinate coordinate = null)
-        {
-            if (coordinate == null)
-            {
-                if (outfit < 0 || outfit >= ChaControl.chaFile.coordinate.Length) return;
-                coordinate = ChaControl.chaFile.coordinate[outfit];
-            }
-            
             PluginData data = new PluginData();
-            bool hasGraph = graphs.ContainsKey(outfit);
-            bool hasBoneEdits = boneEdits.ContainsKey(outfit) && boneEdits[outfit] != null && boneEdits[outfit].Count > 0;
+            int coord = ChaControl.fileStatus.coordinateType;
+            bool hasGraph = graphs.ContainsKey(coord);
+            bool hasBoneEdits = boneEdits.ContainsKey(coord) && boneEdits[coord].Count > 0;
             if (!hasGraph && !hasBoneEdits) return;
 
             if (hasGraph)
             {
-                SerialisedGraph sGraph = SerialisedGraph.Serialise(graphs[outfit]);
-                SerialisedGraphData sGraphData = SerialisedGraphData.Serialise(outfit, graphData[graphs[outfit]]);
+                SerialisedGraph sGraph = SerialisedGraph.Serialise(graphs[coord]);
+                SerialisedGraphData sGraphData = SerialisedGraphData.Serialise(coord, graphData[graphs[coord]]);
                 data.data.Add("Graph", MessagePackSerializer.Serialize(sGraph));
                 data.data.Add("GraphData", MessagePackSerializer.Serialize(sGraphData));
             }
 
             if (hasBoneEdits)
             {
-                data.data.Add("BoneEdits", MessagePackSerializer.Serialize(boneEdits[outfit]));
+                data.data.Add("BoneEdits", MessagePackSerializer.Serialize(boneEdits[coord]));
             }
 
             data.data.Add("Version", saveVersion);
@@ -248,10 +235,6 @@ namespace AmazingNewBoneLogic
             PluginData data = maintainState ? loadedCoordData : GetCoordinateExtendedData(coordinate);
             if (data == null)
             {
-                if (displayGraph && !graphs.ContainsKey(coordIdx))
-                {
-                    createGraph(coordIdx);
-                }
                 return;
             }
 
@@ -296,11 +279,6 @@ namespace AmazingNewBoneLogic
                 {
                     boneEdits[coordIdx] = MessagePackSerializer.Deserialize<List<BoneEffectEdit>>((byte[])coordBoneEditsSerialised);
                 }
-            }
-
-            if (displayGraph && !graphs.ContainsKey(coordIdx))
-            {
-                createGraph(coordIdx);
             }
 
             var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
@@ -449,16 +427,11 @@ namespace AmazingNewBoneLogic
             }
 
             dstGraph.isLoading = false;
-            UpdateCoordinateExtendedData(destinationOutfit);
         }
 
         public void OutfitChanged()
         {
             AmazingNewBoneLogic.Logger.LogDebug("Coordinate changed, applying data...");
-            if (lfg != null && graphData.ContainsKey(lfg))
-            {
-                _lastModeWasAdvanced = graphData[lfg].advanced;
-            }
             activeBoneEditIds.Clear();
             EnsureBoneEffectRegistered();
             StartCoroutine(UpdateLater());
@@ -689,7 +662,6 @@ namespace AmazingNewBoneLogic
 
             // create simple mode data
             graphData[graphs[outfit.Value]] = new GraphData(this, graphs[outfit.Value]);
-            graphData[graphs[outfit.Value]].advanced = _lastModeWasAdvanced;
 
             float topY = 900;
 
@@ -4018,7 +3990,6 @@ namespace AmazingNewBoneLogic
                 dstGraph.isLoading = false;
             }
             
-            UpdateCoordinateExtendedData(destOutfit);
             AmazingNewBoneLogic.Logger.LogMessage($"Transferred {count} bone edits to Outfit {destOutfit + 1}");
         }
 
