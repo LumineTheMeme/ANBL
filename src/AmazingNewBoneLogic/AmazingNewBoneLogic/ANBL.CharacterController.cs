@@ -56,6 +56,7 @@ namespace AmazingNewBoneLogic
 
         internal bool displayGraph = false;
         private bool lastCoordHadANBL = false;
+        private bool lastAdvancedMode = false;
         private static Material mat = new Material(Shader.Find("Hidden/Internal-Colored"));
 
         public PluginData loadedCardData = null;
@@ -342,6 +343,7 @@ namespace AmazingNewBoneLogic
             if (!graphs.ContainsKey(sourceOutfit) && !graphs.ContainsKey(destinationOutfit)) return;
 
             // Create destination graph if it doesn't exist
+            bool destWasCreated = !graphs.ContainsKey(destinationOutfit);
             if (!graphs.ContainsKey(destinationOutfit))
             {
                 createGraph(destinationOutfit);
@@ -356,6 +358,11 @@ namespace AmazingNewBoneLogic
             var dstData = graphData[dstGraph];
             var srcGraph = graphs.ContainsKey(sourceOutfit) ? graphs[sourceOutfit] : null;
             var srcData = srcGraph == null ? null : graphData[srcGraph];
+
+            if (destWasCreated && srcData != null)
+            {
+                dstData.advanced = srcData.advanced;
+            }
 
             // Copy data and nodes
             dstGraph.isLoading = true;
@@ -422,7 +429,7 @@ namespace AmazingNewBoneLogic
         }
 
         public void OutfitChanged()
-        {
+        {;
             AmazingNewBoneLogic.Logger.LogDebug("Coordinate changed, applying data...");
             activeBoneEditIds.Clear();
             EnsureBoneEffectRegistered();
@@ -609,9 +616,29 @@ namespace AmazingNewBoneLogic
 
         private LogicFlowGraph getCurrentGraph()
         {
-            if (!graphs.ContainsKey(ChaControl.fileStatus.coordinateType)) return null;
+            if (!graphs.ContainsKey(ChaControl.fileStatus.coordinateType))
+            {
+                if (displayGraph)
+                {
+                    createGraph();
+                    if (graphs.ContainsKey(ChaControl.fileStatus.coordinateType) && graphData.ContainsKey(graphs[ChaControl.fileStatus.coordinateType]))
+                    {
+                        graphData[graphs[ChaControl.fileStatus.coordinateType]].advanced = lastAdvancedMode;
+                    }
+                }
+                else
+                {
+                    return null;
+                }
+            }
+
+            var graph = graphs[ChaControl.fileStatus.coordinateType];
+            if (graphData.ContainsKey(graph))
+            {
+                lastAdvancedMode = graphData[graph].advanced;
+            }
             lastCoordHadANBL = true;
-            return graphs[ChaControl.fileStatus.coordinateType];
+            return graph;
         }
 
         private void setCurrentGraph(LogicFlowGraph g)
@@ -2205,7 +2232,11 @@ namespace AmazingNewBoneLogic
                     if (GUILayout.Button("Bone Editor", GUILayout.Height(30)))
                     {
                         displayBoneEditor = !displayBoneEditor;
-                        if (displayBoneEditor) BuildBoneCache();
+                        if (displayBoneEditor)
+                        {
+                            BuildBoneCache();
+                            TryPositionBoneEditorWindow();
+                        }
                     }
                     GUILayout.Space(8);
                     if (GUILayout.Button("Advanced Inputs", GUILayout.Height(30)))
@@ -2216,12 +2247,19 @@ namespace AmazingNewBoneLogic
 #endif
                     if (GUILayout.Button(fullCharacter ? "◀ All Outfits ▶" : "◀ Current Outfit ▶"))
                         fullCharacter = !fullCharacter;
-                    if (GUILayout.Button("Load from ASS"))
+                    if (GUILayout.Button("Add all Outputs"))
                     {
-                        if (fullCharacter) TranslateFromAssForCharacter();
-                        else if (ExtendedSave.GetExtendedDataById(ChaControl.nowCoordinate, "madevil.kk.ass") == null)
-                            TranslateFromAssForCharacter(ChaControl.fileStatus.coordinateType);
-                        else TranslateFromAssForCoordinate();
+                        int coord = ChaControl.fileStatus.coordinateType;
+                        if (boneEdits.TryGetValue(coord, out var editsList) && editsList != null)
+                        {
+                            foreach (var edit in editsList)
+                            {
+                                if (lfg.getNodeAt(1000000 + edit.GraphKey) == null)
+                                {
+                                    addOutput(edit.GraphKey, coord, edit.Name);
+                                }
+                            }
+                        }
                     }
 
                     GUILayout.Space(8);
@@ -3272,16 +3310,17 @@ namespace AmazingNewBoneLogic
         {
             if (!boneEditorPositioned)
             {
-                float rightPosition = simpleWindowRect.x + simpleWindowRect.width;
-                if (rightPosition + boneEditorWindowRect.width <= Screen.width)
+                Rect refRect = (lfg != null && graphData.ContainsKey(lfg) && graphData[lfg].advanced) ? normalInputRect : simpleWindowRect;
+                float bottomPosition = refRect.y + refRect.height;
+                if (bottomPosition + boneEditorWindowRect.height <= Screen.height)
                 {
-                    boneEditorWindowRect.x = rightPosition;
+                    boneEditorWindowRect.y = bottomPosition;
                 }
                 else
                 {
-                    boneEditorWindowRect.x = Mathf.Max(0f, simpleWindowRect.x - boneEditorWindowRect.width);
+                    boneEditorWindowRect.y = Mathf.Max(0f, refRect.y - boneEditorWindowRect.height);
                 }
-                boneEditorWindowRect.y = simpleWindowRect.y;
+                boneEditorWindowRect.x = Mathf.Clamp(refRect.x, 0f, Mathf.Max(0f, Screen.width - boneEditorWindowRect.width));
                 boneEditorPositioned = true;
             }
         }
@@ -3341,6 +3380,12 @@ namespace AmazingNewBoneLogic
             {
                 list = new List<BoneEffectEdit>();
                 boneEdits[coord] = list;
+            }
+
+            if (selectedBoneEdit != null && !list.Contains(selectedBoneEdit))
+            {
+                selectedBoneEdit = null;
+                selectedBoneTransform = null;
             }
 
             GUILayout.BeginHorizontal();
@@ -3412,7 +3457,16 @@ namespace AmazingNewBoneLogic
                             }
                         }
 
-                        GUI.color = (selectedBoneEdit == edit) ? Color.cyan : Color.white;
+                        bool isOrphaned = (lfg != null && graphData.ContainsKey(lfg) && graphData[lfg].advanced) && lfg.getNodeAt(1000000 + edit.GraphKey) == null;
+                        if (isOrphaned)
+                        {
+                            if (GUILayout.Button("<", GUILayout.Width(20), GUILayout.Height(30)))
+                            {
+                                addOutput(edit.GraphKey, coord, edit.Name);
+                            }
+                        }
+
+                        GUI.color = isOrphaned ? new Color(1f, 0.5f, 0f) : (selectedBoneEdit == edit) ? Color.cyan : Color.white;
                         if (GUILayout.Button($"{edit.Name}\n<size=10>({edit.BoneName})</size>", new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft }))
                         {
                             selectedBoneEdit = edit;
@@ -3896,6 +3950,7 @@ namespace AmazingNewBoneLogic
 
             if (copyBoneLogicOnTransfer)
             {
+                bool destWasCreated = !graphs.ContainsKey(destOutfit);
                 if (!graphs.ContainsKey(coord)) createGraph(coord);
                 if (!graphs.ContainsKey(destOutfit)) createGraph(destOutfit);
                 
@@ -3903,6 +3958,11 @@ namespace AmazingNewBoneLogic
                 dstGraph = graphs[destOutfit];
                 srcData = graphData[srcGraph];
                 dstData = graphData[dstGraph];
+                
+                if (destWasCreated && srcData != null)
+                {
+                    dstData.advanced = srcData.advanced;
+                }
                 
                 dstGraph.isLoading = true;
             }
