@@ -17,7 +17,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)ANBL.SerialisedGraph.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ANBL.SerialisedNode.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ANBL.TimelineHelper.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)ANBL.TriggerProperty.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ANBL.GroupNode.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ANBL.BoneEffectEdit.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ANBL.BoneEffect.cs" />
