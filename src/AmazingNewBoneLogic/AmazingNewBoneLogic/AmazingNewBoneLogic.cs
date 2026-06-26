@@ -21,8 +21,8 @@ using static HandCtrl;
 namespace AmazingNewBoneLogic
 {
     [BepInPlugin(GUID, PluginName, Version)]
-    [BepInDependency(KoikatuAPI.GUID, KoikatuAPI.VersionConst)]
-    [BepInDependency("KKABMX.Core")]
+    [BepInDependency(KoikatuAPI.GUID, "1.30")]
+    [BepInDependency("KKABMX.Core", "3.2")]
     [BepInDependency("SliderHighlight", BepInDependency.DependencyFlags.SoftDependency)]
     class AmazingNewBoneLogic : BaseUnityPlugin
     {
