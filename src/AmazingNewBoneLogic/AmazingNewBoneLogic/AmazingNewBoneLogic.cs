@@ -27,8 +27,8 @@ namespace AmazingNewBoneLogic
     class AmazingNewBoneLogic : BaseUnityPlugin
     {
         public const string PluginName = "AmazingNewBoneLogic";
-        public const string GUID = "org.njaecha.plugins.anbl";
-        public const string Version = "1.0";
+        public const string GUID = "com.dreamhana.anbl";
+        public const string Version = "1.0.0";
 
         internal new static ManualLogSource Logger;
 
