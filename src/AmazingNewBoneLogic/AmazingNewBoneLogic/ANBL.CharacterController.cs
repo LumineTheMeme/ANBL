@@ -3541,6 +3541,11 @@ namespace AmazingNewBoneLogic
                     }
                     if (GUILayout.Button("Transfer"))
                     {
+                        float popupWidth = 250f;
+                        float popupHeight = 250f; // approx height
+                        float px = boneEditorWindowRect.x - popupWidth;
+                        if (px < 0) px = boneEditorWindowRect.xMax;
+                        transferPopupRect = new Rect(px, boneEditorWindowRect.y, popupWidth, popupHeight);
                         showTransferPopup = true;
                     }
                     GUILayout.EndHorizontal();
