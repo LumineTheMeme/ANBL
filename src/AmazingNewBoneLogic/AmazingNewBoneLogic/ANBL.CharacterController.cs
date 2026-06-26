@@ -1439,6 +1439,28 @@ namespace AmazingNewBoneLogic
             }
         }
 
+        public static string GetCounterBoneName(string boneName)
+        {
+            if (string.IsNullOrEmpty(boneName)) return null;
+
+            if (boneName.EndsWith("R", StringComparison.Ordinal))
+                return boneName.Remove(boneName.Length - 1) + "L";
+            if (boneName.EndsWith("L", StringComparison.Ordinal))
+                return boneName.Remove(boneName.Length - 1) + "R";
+            if (boneName.EndsWith("R_00", StringComparison.Ordinal))
+                return boneName.Remove(boneName.Length - 4) + "L_00";
+            if (boneName.EndsWith("L_00", StringComparison.Ordinal))
+                return boneName.Remove(boneName.Length - 4) + "R_00";
+            
+            var i = boneName.IndexOf("R_", StringComparison.Ordinal);
+            if (i > 0) return boneName.Remove(i, 1).Insert(i, "L");
+
+            i = boneName.IndexOf("L_", StringComparison.Ordinal);
+            if (i > 0) return boneName.Remove(i, 1).Insert(i, "R");
+
+            return null;
+        }
+
         public IEnumerable<string> GetAllConfiguredBoneNames()
         {
             int coord = ChaControl.fileStatus.coordinateType;
@@ -1447,7 +1469,7 @@ namespace AmazingNewBoneLogic
 
             return edits
                 .Where(e => !string.IsNullOrEmpty(e.BoneName))
-                .Select(e => e.BoneName)
+                .SelectMany(e => e.IsLinked && !string.IsNullOrEmpty(e.LinkedBoneName) ? new[] { e.BoneName, e.LinkedBoneName } : new[] { e.BoneName })
                 .Distinct();
         }
 
@@ -1457,7 +1479,7 @@ namespace AmazingNewBoneLogic
                 return null;
 
             var activeEdits = edits
-                .Where(e => e.BoneName == bone && activeBoneEditIds.Contains(e.Id) && e.Modifier != null)
+                .Where(e => (e.BoneName == bone || (e.IsLinked && e.LinkedBoneName == bone)) && activeBoneEditIds.Contains(e.Id) && e.Modifier != null)
                 .ToList();
 
             if (activeEdits.Count == 0)
@@ -1471,10 +1493,21 @@ namespace AmazingNewBoneLogic
             foreach (var edit in activeEdits)
             {
                 var mod = edit.Modifier;
+                bool isMirror = edit.IsLinked && edit.LinkedBoneName == bone;
+
                 scale = Vector3.Scale(scale, mod.ScaleModifier);
                 length *= mod.LengthModifier;
-                position += mod.PositionModifier;
-                rotation += mod.RotationModifier;
+
+                if (isMirror)
+                {
+                    position += new Vector3(-mod.PositionModifier.x, mod.PositionModifier.y, mod.PositionModifier.z);
+                    rotation += new Vector3(mod.RotationModifier.x, -mod.RotationModifier.y, -mod.RotationModifier.z);
+                }
+                else
+                {
+                    position += mod.PositionModifier;
+                    rotation += mod.RotationModifier;
+                }
             }
 
             return new BoneModifierData(scale, length, position, rotation);
@@ -3591,6 +3624,7 @@ namespace AmazingNewBoneLogic
                         if (selectedBoneTransform != null)
                         {
                             GUILayout.Space(20);
+                            string counterBone = GetCounterBoneName(selectedBoneTransform.name);
                             if (GUILayout.Button($"Create new bone edit for\n{selectedBoneTransform.name}", GUILayout.Height(55)))
                             {
                                 int nextKey = (list.Count > 0) ? list.Max(e => e.GraphKey) + 1 : 0;
@@ -3613,6 +3647,36 @@ namespace AmazingNewBoneLogic
                                 addOutput(newEdit.GraphKey, coord, newEdit.Name);
                                 var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
                                 if (boneController != null) boneController.NeedsFullRefresh = true;
+                            }
+
+                            if (!string.IsNullOrEmpty(counterBone))
+                            {
+                                GUILayout.Space(10);
+                                if (GUILayout.Button($"Create new linked bone edit for\n{selectedBoneTransform.name} and {counterBone}", GUILayout.Height(55)))
+                                {
+                                    int nextKey = (list.Count > 0) ? list.Max(e => e.GraphKey) + 1 : 0;
+                                    string baseName = $"{selectedBoneTransform.name} (Linked)";
+                                    string proposedName = baseName;
+                                    int suffix = 2;
+                                    while (list.Any(e => e.Name.Equals(proposedName, StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        proposedName = $"{baseName} {suffix}";
+                                        suffix++;
+                                    }
+
+                                    var newEdit = new BoneEffectEdit(selectedBoneTransform.name)
+                                    {
+                                        Name = proposedName,
+                                        GraphKey = nextKey,
+                                        IsLinked = true,
+                                        LinkedBoneName = counterBone
+                                    };
+                                    list.Add(newEdit);
+                                    selectedBoneEdit = newEdit;
+                                    addOutput(newEdit.GraphKey, coord, newEdit.Name);
+                                    var boneController = ChaControl?.GetComponent<KKABMX.Core.BoneController>();
+                                    if (boneController != null) boneController.NeedsFullRefresh = true;
+                                }
                             }
                         }
                         GUILayout.FlexibleSpace();

@@ -23,6 +23,12 @@ namespace AmazingNewBoneLogic
         [Key(4)]
         public int GraphKey { get; set; }
 
+        [Key(5)]
+        public bool IsLinked { get; set; }
+
+        [Key(6)]
+        public string LinkedBoneName { get; set; }
+
         public BoneEffectEdit()
         {
             Id = Guid.NewGuid().ToString();
@@ -47,7 +53,9 @@ namespace AmazingNewBoneLogic
                 Name = Name + " (Copy)",
                 BoneName = BoneName,
                 Modifier = Modifier.Clone(),
-                GraphKey = GraphKey
+                GraphKey = GraphKey,
+                IsLinked = IsLinked,
+                LinkedBoneName = LinkedBoneName
             };
         }
     }
