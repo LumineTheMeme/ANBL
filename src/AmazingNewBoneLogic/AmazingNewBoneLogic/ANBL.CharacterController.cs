@@ -1236,7 +1236,7 @@ namespace AmazingNewBoneLogic
                 var graph = graphs[outfit.Value];
                 LogicFlowOutput output =
                     new LogicFlowOutput_Action((value) => setAccessoryState(slot, value), graph, key: idxSlot)
-                        { label = name ?? $"Slot {slot + 1}", toolTipText = $"Slot {slot + 1}" };
+                        { label = name ?? $"Slot {slot + 1}", toolTipText = name ?? $"Slot {slot + 1}" };
                 int numOut = graphs[outfit.Value].getAllNodes().Where(x => x is LogicFlowOutput).Count();
                 output.setPosition(OutputPos(numOut + 1));
                 if (graph.getSize().x < output.getPosition().x + 80f)
@@ -1629,20 +1629,13 @@ namespace AmazingNewBoneLogic
             },
             new List<string> {
                 "Advanced Input Nodes:",
+                "ALWAYS ON is always on\n" +
                 "HAND PATTERN is on if the specified hand is set to the specified pattern\n" +
                 "EYE PATTERN is on if the eyes are set to the specified pattern\n" +
                 "EYE THRESHOLD is on if the eye are MORE or LESS OR EQUALLY open compared to the specified threshold\n" +
                 "MOUTH PATTERN is on if the moth is set to the specified pattern\n" +
                 "MOUTH THRESHOLD is on if the mouth is MORE or LESS OR EQUALLY open compared to the specified theshold\n" +
                 "EYEBROW PATTERN is on if the eyesbrows are set to the specified pattern"
-            },
-            new List<string> {
-                "ASS Data Conversion",
-                "Feature is experimental, no guarantees!!\n" +
-                "Tries to convert Accessory State Sync data saved in the card to a ANBL graph\n" +
-                "Only Accessories with ONE or TWO connected clothing slots are supported\n" +
-                "The generated nodes will not be sorted properly and overlap\n" +
-                "The generated graph can often be simplified a lot"
             }
         };
 
@@ -1689,6 +1682,13 @@ namespace AmazingNewBoneLogic
             if (bindStateStyleOff == null || bindStateStyleOn == null)
             {
                 InitGUI();
+            }
+
+            Matrix4x4 originalMatrix = GUI.matrix;
+            float mainScale = AmazingNewBoneLogic.UIMainScaleFactor.Value;
+            if (mainScale != 1f)
+            {
+                GUIUtility.ScaleAroundPivot(new Vector2(mainScale, mainScale), Vector2.zero);
             }
 
             // Main simple window
@@ -2222,14 +2222,14 @@ namespace AmazingNewBoneLogic
                     headerTextStyle.padding.left = 1;
                 }
 
-                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), rTex);
+                GUI.DrawTexture(new Rect(0, 0, Screen.width / mainScale, Screen.height / mainScale), rTex);
 
                 GUI.Label(
-                    new Rect(screenToGUI(lfg.positionUI + new Vector2(10, lfg.sizeUI.y + (lfg.getUIScale() * 20) + 15)),
+                    new Rect(screenToGUI(lfg.positionUI + new Vector2(10, lfg.sizeUI.y + (lfg.getUIScale() * 20) + 15)) / mainScale,
                         new Vector2(250, 25)), $"AmazingNewBoneLogic v{AmazingNewBoneLogic.Version}",
                     headerTextStyle);
                 var closeRect =
-                    new Rect(screenToGUI(lfg.positionUI + lfg.sizeUI + new Vector2(-65, (lfg.getUIScale() * 28) + 4)),
+                    new Rect(screenToGUI(lfg.positionUI + lfg.sizeUI + new Vector2(-65, (lfg.getUIScale() * 28) + 4)) / mainScale,
                         new Vector2(60, (lfg.getUIScale() * 10) + 10));
                 var simpleRect = new Rect(closeRect.position - new Vector2(closeRect.width + 5, 0), closeRect.size);
                 if (GUI.Button(simpleRect, "Simple"))
@@ -2250,7 +2250,7 @@ namespace AmazingNewBoneLogic
                     Hide();
                 }
 
-                normalInputRect.position = screenToGUI(lfg.positionUI + lfg.sizeUI + new Vector2(5, 0));
+                normalInputRect.position = screenToGUI(lfg.positionUI + lfg.sizeUI + new Vector2(5, 0)) / mainScale;
                 normalInputRect = GUILayout.Window(normalInputWindowID, normalInputRect, (windowId) =>
                 {
                     GUILayout.BeginVertical();
@@ -2340,10 +2340,10 @@ namespace AmazingNewBoneLogic
 
                 if (showHelp)
                 {
-                    var helpRect = new Rect(screenToGUI(lfg.positionUI + new Vector2(-255, lfg.sizeUI.y)),
+                    var helpRect = new Rect(screenToGUI(lfg.positionUI + new Vector2(-255, lfg.sizeUI.y)) / mainScale,
                         new Vector2(250, 350));
                     GUI.Box(
-                        new Rect(screenToGUI(lfg.positionUI + new Vector2(-255, lfg.sizeUI.y)), new Vector2(250, 350)),
+                        new Rect(screenToGUI(lfg.positionUI + new Vector2(-255, lfg.sizeUI.y)) / mainScale, new Vector2(250, 350)),
                         $"Help ( {helpPage + 1} / {helpText.Count} )", IMGUIUtils.SolidBackgroundGuiSkin.window);
                     GUILayout.BeginArea(helpRect);
                     GUILayout.BeginHorizontal();
@@ -2381,6 +2381,8 @@ namespace AmazingNewBoneLogic
 
                 #endregion
 
+                if (mainScale != 1f) GUI.matrix = originalMatrix;
+
                 lfg.ongui();
 
                 #region Advanced Mode Events
@@ -2399,7 +2401,7 @@ namespace AmazingNewBoneLogic
                                     renamedNode = kvp.Key;
                                     if (kvp.Value is LogicFlowNode_GRP grp) renameName = grp.getName();
                                     else renameName = kvp.Value.label;
-                                    renameRect = new Rect(e.mousePosition - new Vector2(120, 20), new Vector2(240, 40));
+                                    renameRect = new Rect((e.mousePosition - new Vector2(120, 20)) / mainScale, new Vector2(240, 40));
                                     break;
                                 }
                             }
@@ -2410,7 +2412,7 @@ namespace AmazingNewBoneLogic
                                     AmazingNewBoneLogic.Logger.LogDebug(
                                         $"Selecting outputs for ({grp.getName()})...");
                                     groupToSetActives = grp;
-                                    groupScrollRect = new Rect(e.mousePosition - new Vector2(-5, 120),
+                                    groupScrollRect = new Rect((e.mousePosition - new Vector2(-5, 120)) / mainScale,
                                         new Vector2(120, 240));
                                     groupConnections = getCurrentGraph().nodes.Values
                                         .Where(x => x.inputs.Any(y => y == grp.index)).ToList();
@@ -2440,11 +2442,24 @@ namespace AmazingNewBoneLogic
                 }
 
                 #endregion
+
+                // Keep LogicFlowGraph on screen
+                float lfgW = lfg.sizeUI.x;
+                float lfgH = -lfg.sizeUI.y;
+                Vector2 clampedPos = new Vector2(
+                    Mathf.Clamp(lfg.positionUI.x, -lfgW * 0.9f, Screen.width - lfgW * 0.1f),
+                    Mathf.Clamp(lfg.positionUI.y, lfgH * 0.1f, Screen.height + lfgH * 0.9f)
+                );
+                if (clampedPos != lfg.positionUI)
+                {
+                    lfg.setPosition(clampedPos);
+                }
             }
 
             #region Temporary IMGUI Elements
 
             {
+                if (mainScale != 1f) GUIUtility.ScaleAroundPivot(new Vector2(mainScale, mainScale), Vector2.zero);
                 var solidSkin = IMGUIUtils.SolidBackgroundGuiSkin;
                 var mouse = Event.current.mousePosition;
                 Vector2 expansion;
@@ -2685,6 +2700,7 @@ namespace AmazingNewBoneLogic
                     KKAPI.Utilities.IMGUIUtils.EatInputInRect(transferPopupRect);
                 }
             }
+            if (mainScale != 1f) GUI.matrix = originalMatrix;
         }
 
         void InitGUI()
@@ -3625,7 +3641,7 @@ namespace AmazingNewBoneLogic
                     if (selectedBoneEdit == null)
                     {
                         GUILayout.FlexibleSpace();
-                        GUILayout.Label("Select a bone edit from the left list to modify its parameters.", new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter });
+                        GUILayout.Label("Select a bone to modify.", new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter });
                         if (selectedBoneTransform != null)
                         {
                             GUILayout.Space(20);
@@ -3634,13 +3650,8 @@ namespace AmazingNewBoneLogic
                             {
                                 int nextKey = (list.Count > 0) ? list.Max(e => e.GraphKey) + 1 : 0;
                                 string baseName = selectedBoneTransform.name;
-                                string proposedName = baseName;
-                                int suffix = 2;
-                                while (list.Any(e => e.Name.Equals(proposedName, StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    proposedName = $"{baseName} {suffix}";
-                                    suffix++;
-                                }
+                                var existingNames = list.Select(e => e.Name);
+                                string proposedName = GetUniqueBoneEditName(baseName, existingNames);
 
                                 var newEdit = new BoneEffectEdit(selectedBoneTransform.name)
                                 {
@@ -3661,13 +3672,8 @@ namespace AmazingNewBoneLogic
                                 {
                                     int nextKey = (list.Count > 0) ? list.Max(e => e.GraphKey) + 1 : 0;
                                     string baseName = $"{selectedBoneTransform.name} (Linked)";
-                                    string proposedName = baseName;
-                                    int suffix = 2;
-                                    while (list.Any(e => e.Name.Equals(proposedName, StringComparison.OrdinalIgnoreCase)))
-                                    {
-                                        proposedName = $"{baseName} {suffix}";
-                                        suffix++;
-                                    }
+                                    var existingNames = list.Select(e => e.Name);
+                                    string proposedName = GetUniqueBoneEditName(baseName, existingNames);
 
                                     var newEdit = new BoneEffectEdit(selectedBoneTransform.name)
                                     {
@@ -3691,7 +3697,13 @@ namespace AmazingNewBoneLogic
                         GUILayout.Label("Edit Details", GUI.skin.label);
                         GUILayout.BeginHorizontal();
                         GUILayout.Label("Name:", GUILayout.Width(50));
-                        selectedBoneEdit.Name = GUILayout.TextField(selectedBoneEdit.Name);
+                        string newName = GUILayout.TextField(selectedBoneEdit.Name);
+                        if (newName != selectedBoneEdit.Name)
+                        {
+                            selectedBoneEdit.Name = newName;
+                            var node = getOutput(selectedBoneEdit.GraphKey);
+                            if (node != null) node.label = newName;
+                        }
                         GUILayout.EndHorizontal();
 
                         GUILayout.Label($"Target Bone: {selectedBoneEdit.BoneName}", GUI.skin.box);
@@ -4043,6 +4055,10 @@ namespace AmazingNewBoneLogic
                 if (edit != null)
                 {
                     var clone = edit.Clone();
+
+                    var existingNames = destEdits.Select(e => e.Name);
+                    clone.Name = GetUniqueBoneEditName(clone.Name, existingNames);
+
                     int srcKey = clone.GraphKey;
                     int dstKey = nextKey++;
                     clone.GraphKey = dstKey;
@@ -4065,6 +4081,7 @@ namespace AmazingNewBoneLogic
                         {
                             var sNode = SerialisedNode.Serialise(sOutput, srcGraph);
                             sNode.index = dstIdxSlot;
+                            sNode.name = clone.Name;
                             deserialiseNode(saveVersion, destOutfit, sNode);
 
                             List<int> iTree = sOutput.getInputTree();
@@ -4176,6 +4193,36 @@ namespace AmazingNewBoneLogic
             }
         }
 
+        private string GetUniqueBoneEditName(string baseName, IEnumerable<string> existingNames)
+        {
+            if (!existingNames.Any(n => n.Equals(baseName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return baseName;
+            }
+
+            string coreName = baseName;
+            var match = System.Text.RegularExpressions.Regex.Match(baseName, @"^(.*?) \(\d+\)$");
+            if (match.Success)
+            {
+                coreName = match.Groups[1].Value;
+            }
+
+            string proposedName = coreName;
+            int suffix = 1;
+
+            if (!existingNames.Any(n => n.Equals(coreName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return coreName;
+            }
+
+            while (existingNames.Any(n => n.Equals(proposedName, StringComparison.OrdinalIgnoreCase)))
+            {
+                proposedName = $"{coreName} ({suffix})";
+                suffix++;
+            }
+            return proposedName;
+        }
+
         private void SyncNamesAndDeletedNodes()
         {
             if (lfg == null) return;
@@ -4196,8 +4243,19 @@ namespace AmazingNewBoneLogic
                 }
             }
 
-            // 2. We no longer auto-delete bone edits here to prevent immediate deletion upon creation.
-            // Users must delete bone edits manually using the Bone Editor UI.
+            // 2. Ensure unique names among bone edits
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var edit in edits)
+            {
+                if (seenNames.Contains(edit.Name))
+                {
+                    string uniqueName = GetUniqueBoneEditName(edit.Name, seenNames);
+                    edit.Name = uniqueName;
+                    var node = getOutput(edit.GraphKey, coord);
+                    if (node != null) node.label = uniqueName;
+                }
+                seenNames.Add(edit.Name);
+            }
         }
 
         #endregion

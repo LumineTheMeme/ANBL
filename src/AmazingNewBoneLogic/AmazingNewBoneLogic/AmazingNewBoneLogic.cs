@@ -38,6 +38,7 @@ namespace AmazingNewBoneLogic
 
         public static ConfigEntry<bool> Debug { get; private set; }
         public static ConfigEntry<float> UIScaleModifier { get; private set; }
+        public static ConfigEntry<float> UIMainScaleFactor { get; private set; }
         public static ConfigEntry<KeyboardShortcut> ShortcutOpen { get; private set; }
 
         public static ConfigEntry<KeyCode> UIDeleteNodeKey;
@@ -60,6 +61,9 @@ namespace AmazingNewBoneLogic
                     new KKAPI.Utilities.ConfigurationManagerAttributes { IsAdvanced = true }));
             UIScaleModifier = Config.Bind("UI", "UI Scale Factor", Screen.height <= 1080 ? 1.3f : 1f,
                 new ConfigDescription("Additional Scale to apply to the UI",
+                    new AcceptableValueRange<float>(0.5f, 2f)));
+            UIMainScaleFactor = Config.Bind("UI", "Main UI Scale Factor", Screen.height <= 1080 ? 1.3f : 1f,
+                new ConfigDescription("Scale factor applied to all standard IMGUI windows (Simple Mode, Bone Editor, etc.)",
                     new AcceptableValueRange<float>(0.5f, 2f)));
             UIDeleteNodeKey = Config.Bind("Keybinds", "Delete Node", KeyCode.Delete,
                 "Key press to delete the selected node(s)");

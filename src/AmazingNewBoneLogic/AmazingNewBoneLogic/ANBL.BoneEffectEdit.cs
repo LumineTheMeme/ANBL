@@ -50,7 +50,7 @@ namespace AmazingNewBoneLogic
             return new BoneEffectEdit
             {
                 Id = Guid.NewGuid().ToString(), // Give clone a new unique ID
-                Name = Name + " (Copy)",
+                Name = Name,
                 BoneName = BoneName,
                 Modifier = Modifier.Clone(),
                 GraphKey = GraphKey,
