@@ -3144,6 +3144,18 @@ namespace AmazingNewBoneLogic
 
         private void DrawBoneEditorWindow(int windowId)
         {
+            GUIStyle closeButtonStyle = new GUIStyle(GUI.skin.button);
+            closeButtonStyle.padding = new RectOffset(0, 0, 0, 0);
+            closeButtonStyle.alignment = TextAnchor.MiddleCenter;
+            closeButtonStyle.normal.textColor = new Color(0.9f, 0.35f, 0.35f);
+            closeButtonStyle.hover.textColor = Color.red;
+            closeButtonStyle.fontStyle = FontStyle.Bold;
+
+            if (GUI.Button(new Rect(boneEditorWindowRect.width - 20, 2, 16, 16), "X", closeButtonStyle))
+            {
+                displayBoneEditor = false;
+            }
+
             if (Event.current.type == EventType.Layout)
             {
                 hoveredBoneTransform = null;
