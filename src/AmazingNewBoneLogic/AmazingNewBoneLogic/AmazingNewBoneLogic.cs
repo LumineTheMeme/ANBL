@@ -28,7 +28,7 @@ namespace AmazingNewBoneLogic
     {
         public const string PluginName = "AmazingNewBoneLogic";
         public const string GUID = "com.dreamhana.anbl";
-        public const string Version = "1.0.1";
+        public const string Version = "1.0.2";
 
         internal new static ManualLogSource Logger;
 
