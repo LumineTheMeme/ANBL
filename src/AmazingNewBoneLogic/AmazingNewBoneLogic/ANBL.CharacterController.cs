@@ -1,4 +1,4 @@
-﻿using KKAPI;
+using KKAPI;
 using System;
 using HarmonyLib;
 using LogicFlows;
@@ -2784,6 +2784,9 @@ namespace AmazingNewBoneLogic
         // Mouth Pattern
         private string advinpMouthPatternText = "1";
 
+        // Accessory
+        private string advinpAccessorySlotText = "1";
+
         private void CustomInputWindowFunction(int id)
         {
             GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
@@ -2813,6 +2816,28 @@ namespace AmazingNewBoneLogic
             {
                 addAdvancedInputAlwaysOn(lfg.getSize() / 2);
             }
+            GUILayout.Space(15);
+
+            #endregion
+
+            #region Accessory Input
+
+            GUILayout.Label("Accessory Show State", labelStyle);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Slot:", GUILayout.Width(40));
+            advinpAccessorySlotText = GUILayout.TextField(advinpAccessorySlotText, GUILayout.Width(50));
+            if (GUILayout.Button("+", GUILayout.Width(25)) && int.TryParse(advinpAccessorySlotText, out int accPt1))
+                advinpAccessorySlotText = (accPt1 + 1).ToString();
+            if (GUILayout.Button("-", GUILayout.Width(25)) && int.TryParse(advinpAccessorySlotText, out int accPt2) &&
+                accPt2 > 1) advinpAccessorySlotText = (accPt2 - 1).ToString();
+            GUILayout.EndHorizontal();
+            
+            bool evalAcc = int.TryParse(advinpAccessorySlotText, out int accSlot) && accSlot >= 1 && accSlot <= 20;
+            if (GUILayout.Button("Add Accessory Input", evalAcc ? buttonStyleGreen : buttonStyleRed) && evalAcc)
+            {
+                addAdvancedInputAccessory(accSlot - 1, lfg.getSize() / 2);
+            }
+
             GUILayout.Space(15);
 
             #endregion
