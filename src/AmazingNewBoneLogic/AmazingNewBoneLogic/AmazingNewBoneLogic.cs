@@ -18,6 +18,9 @@ using System.Linq;
 using Studio;
 using static HandCtrl;
 
+[assembly: System.Reflection.AssemblyVersion(AmazingNewBoneLogic.AmazingNewBoneLogic.Version)]
+[assembly: System.Reflection.AssemblyFileVersion(AmazingNewBoneLogic.AmazingNewBoneLogic.Version)]
+
 namespace AmazingNewBoneLogic
 {
     [BepInPlugin(GUID, PluginName, Version)]
