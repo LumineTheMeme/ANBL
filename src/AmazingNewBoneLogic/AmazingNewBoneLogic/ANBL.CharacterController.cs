@@ -1672,6 +1672,7 @@ namespace AmazingNewBoneLogic
         private string confirmTitle = "";
         private string confirmText = "";
         private ConfirmFunc onConfirm = null;
+        private Vector2 _globalMouseScaled = Vector2.zero;
 
         private delegate void ConfirmFunc();
 
@@ -1690,6 +1691,7 @@ namespace AmazingNewBoneLogic
             {
                 GUIUtility.ScaleAroundPivot(new Vector2(mainScale, mainScale), Vector2.zero);
             }
+            _globalMouseScaled = Event.current.mousePosition / mainScale;
 
             // Main simple window
             if (displayGraph && !graphData[lfg].advanced)
@@ -1710,7 +1712,7 @@ namespace AmazingNewBoneLogic
                             {
                                 confirmRect =
                                     new Rect(
-                                        simpleWindowRect.position + Event.current.mousePosition - new Vector2(150, 30),
+                                        _globalMouseScaled - new Vector2(150, 30),
                                         new Vector2(300, 60));
                                 confirmTitle = "Clearing data";
                                 confirmText = "ALL simple mode data will be erased!";
@@ -1742,7 +1744,7 @@ namespace AmazingNewBoneLogic
                             {
                                 confirmRect =
                                     new Rect(
-                                        simpleWindowRect.position + Event.current.mousePosition - new Vector2(150, 30),
+                                        _globalMouseScaled - new Vector2(150, 30),
                                         new Vector2(300, 60));
                                 confirmTitle = "Switching modes";
                                 confirmText =
@@ -1920,9 +1922,7 @@ namespace AmazingNewBoneLogic
                                                     renamedNode = node.index;
                                                     renameRect =
                                                         new Rect(
-                                                            Event.current.mousePosition - new Vector2(120, 20) +
-                                                            grpRect.position + simpleWindowRect.position -
-                                                            simpleWindowScrollPosGrp,
+                                                            _globalMouseScaled - new Vector2(120, 20),
                                                             new Vector2(240, 40));
                                                     renameName = node.getName();
                                                 }
@@ -2043,12 +2043,8 @@ namespace AmazingNewBoneLogic
                                                         grpBeingAddedTo = node.index;
                                                         grpAddFilter = "";
                                                         grpAddRect = new Rect(
-                                                            simpleWindowRect.x + simpleWindowRect.width - 335f,
-                                                            simpleWindowRect.y + baseHeight +
-                                                            sumChildren * (childHeight) + baseBoxHeight * (i + 1) -
-                                                            simpleWindowScrollPosGrp.y,
-                                                            300f,
-                                                            240f
+                                                            _globalMouseScaled - new Vector2(300, 0),
+                                                            new Vector2(300f, 240f)
                                                         );
                                                     }
 
@@ -2086,10 +2082,8 @@ namespace AmazingNewBoneLogic
                                         {
                                             simpleAccBeingBound = idx;
                                             simpleAccBindRect = new Rect(
-                                                simpleWindowRect.x + dropOffset.x,
-                                                simpleWindowRect.y + dropOffset.y,
-                                                120f,
-                                                160f
+                                                _globalMouseScaled,
+                                                new Vector2(120f, 160f)
                                             );
                                         }
                                     }
@@ -2465,7 +2459,7 @@ namespace AmazingNewBoneLogic
                 Vector2 expansion;
                 // Node renaming
                 expansion = new Vector2(30, 10);
-                if (renamedNode != null &&
+                if (renamedNode != null && Event.current.type != EventType.Used && Event.current.type != EventType.Layout &&
                     !new Rect(renameRect.position - expansion, renameRect.size + 2 * expansion).Contains(mouse))
                 {
                     renamedNode = null;
@@ -2508,7 +2502,7 @@ namespace AmazingNewBoneLogic
 
                 // Group connection selection
                 expansion = new Vector2(10, 10);
-                if (groupToSetActives != null &&
+                if (groupToSetActives != null && Event.current.type != EventType.Used && Event.current.type != EventType.Layout &&
                     !new Rect(groupScrollRect.position - expansion, groupScrollRect.size + 2 * expansion)
                         .Contains(mouse))
                 {
@@ -2547,7 +2541,7 @@ namespace AmazingNewBoneLogic
 
                 // Binding selector
                 expansion = new Vector2(10, 30);
-                if (simpleAccBeingBound != null &&
+                if (simpleAccBeingBound != null && Event.current.type != EventType.Used && Event.current.type != EventType.Layout &&
                     !new Rect(simpleAccBindRect.position - expansion, simpleAccBindRect.size + 2 * expansion)
                         .Contains(mouse))
                 {
@@ -2591,7 +2585,7 @@ namespace AmazingNewBoneLogic
 
                 // New child selection
                 expansion = new Vector2(10, 30);
-                if (grpBeingAddedTo != null &&
+                if (grpBeingAddedTo != null && Event.current.type != EventType.Used && Event.current.type != EventType.Layout &&
                     !new Rect(grpAddRect.position - expansion, grpAddRect.size + 2 * expansion).Contains(mouse))
                 {
                     grpBeingAddedTo = null;
@@ -2645,7 +2639,7 @@ namespace AmazingNewBoneLogic
 
                 // Confirmation window
                 expansion = new Vector2(10, 10);
-                if (isConfirming &&
+                if (isConfirming && Event.current.type != EventType.Used && Event.current.type != EventType.Layout &&
                     !new Rect(confirmRect.position - expansion, confirmRect.size + 2 * expansion).Contains(mouse))
                 {
                     isConfirming = false;
@@ -3179,7 +3173,7 @@ namespace AmazingNewBoneLogic
                  if (GUILayout.Button("Clear", GUILayout.Width(50)))
                  {
                      confirmRect = new Rect(
-                         boneEditorWindowRect.position + Event.current.mousePosition - new Vector2(150, 30),
+                         _globalMouseScaled - new Vector2(150, 30),
                          new Vector2(300, 60));
                      confirmTitle = "Clearing Bone Edits";
                      confirmText = "ALL bone effect definitions will be erased!";
