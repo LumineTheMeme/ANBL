@@ -29,6 +29,15 @@ namespace AmazingNewBoneLogic
         [Key(6)]
         public string LinkedBoneName { get; set; }
 
+        [Key(7)]
+        public bool LinkScale { get; set; }
+
+        [Key(8)]
+        public bool LinkPosition { get; set; }
+
+        [Key(9)]
+        public bool LinkRotation { get; set; }
+
         public BoneEffectEdit()
         {
             Id = Guid.NewGuid().ToString();
@@ -55,7 +64,10 @@ namespace AmazingNewBoneLogic
                 Modifier = Modifier.Clone(),
                 GraphKey = GraphKey,
                 IsLinked = IsLinked,
-                LinkedBoneName = LinkedBoneName
+                LinkedBoneName = LinkedBoneName,
+                LinkScale = LinkScale,
+                LinkPosition = LinkPosition,
+                LinkRotation = LinkRotation
             };
         }
     }

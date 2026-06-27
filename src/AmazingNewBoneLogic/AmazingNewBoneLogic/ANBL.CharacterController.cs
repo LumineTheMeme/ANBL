@@ -3203,6 +3203,7 @@ namespace AmazingNewBoneLogic
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Filter:", GUILayout.Width(45));
                 boneEffectSearch = GUILayout.TextField(boneEffectSearch);
+                if (GUILayout.Button("Clear", GUILayout.ExpandWidth(false))) boneEffectSearch = "";
                 GUILayout.EndHorizontal();
 
                 // Delete/Transfer mode prompt/buttons
@@ -3335,6 +3336,7 @@ namespace AmazingNewBoneLogic
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Search:", GUILayout.Width(50));
                 boneTreeSearch = GUILayout.TextField(boneTreeSearch);
+                if (GUILayout.Button("Clear", GUILayout.ExpandWidth(false))) boneTreeSearch = "";
                 GUILayout.EndHorizontal();
 
                 boneTreeScrollPos = GUILayout.BeginScrollView(boneTreeScrollPos, GUILayout.ExpandHeight(true));
@@ -3444,10 +3446,19 @@ namespace AmazingNewBoneLogic
                         GUILayout.Label("Modifiers", GUI.skin.label);
 
                         var mod = selectedBoneEdit.Modifier;
-                        mod.ScaleModifier = DrawVector3Sliders("Scale", mod.ScaleModifier, 0.0f, 5.0f, 1.0f, ref stepSizeScale, ref stepSizeScaleStr, ref linkScale);
+                        bool tmpLinkScale = selectedBoneEdit.LinkScale;
+                        mod.ScaleModifier = DrawVector3Sliders("Scale", mod.ScaleModifier, 0.0f, 5.0f, 1.0f, ref stepSizeScale, ref stepSizeScaleStr, ref tmpLinkScale);
+                        selectedBoneEdit.LinkScale = tmpLinkScale;
+                        
                         mod.LengthModifier = DrawSingleSlider("Length", mod.LengthModifier, 0.0f, 5.0f, 1.0f, ref stepSizeLength, ref stepSizeLengthStr);
-                        mod.PositionModifier = DrawVector3Sliders("Position", mod.PositionModifier, -10.0f, 10.0f, 0.0f, ref stepSizePosition, ref stepSizePositionStr, ref linkPosition);
-                        mod.RotationModifier = DrawVector3Sliders("Rotation", mod.RotationModifier, -360.0f, 360.0f, 0.0f, ref stepSizeRotation, ref stepSizeRotationStr, ref linkRotation);
+                        
+                        bool tmpLinkPosition = selectedBoneEdit.LinkPosition;
+                        mod.PositionModifier = DrawVector3Sliders("Position", mod.PositionModifier, -10.0f, 10.0f, 0.0f, ref stepSizePosition, ref stepSizePositionStr, ref tmpLinkPosition);
+                        selectedBoneEdit.LinkPosition = tmpLinkPosition;
+                        
+                        bool tmpLinkRotation = selectedBoneEdit.LinkRotation;
+                        mod.RotationModifier = DrawVector3Sliders("Rotation", mod.RotationModifier, -360.0f, 360.0f, 0.0f, ref stepSizeRotation, ref stepSizeRotationStr, ref tmpLinkRotation);
+                        selectedBoneEdit.LinkRotation = tmpLinkRotation;
 
                         GUILayout.Space(15);
                         GUILayout.BeginHorizontal();
@@ -3505,15 +3516,12 @@ namespace AmazingNewBoneLogic
 
         private float stepSizeScale = 0.1f;
         private string stepSizeScaleStr = "0.1";
-        private bool linkScale = false;
         private float stepSizeLength = 0.01f;
         private string stepSizeLengthStr = "0.01";
         private float stepSizePosition = 0.01f;
         private string stepSizePositionStr = "0.01";
-        private bool linkPosition = false;
         private float stepSizeRotation = 1.0f;
         private string stepSizeRotationStr = "1";
-        private bool linkRotation = false;
 
         private Vector3 DrawVector3Sliders(string label, Vector3 value, float min, float max, float def, ref float stepSize, ref string stepSizeStr, ref bool linkMode)
         {
