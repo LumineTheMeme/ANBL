@@ -59,10 +59,10 @@ namespace AmazingNewBoneLogic
             Debug = Config.Bind("Advanced", "Debug", false,
                 new ConfigDescription("Whether to log detailed debug messages", null,
                     new KKAPI.Utilities.ConfigurationManagerAttributes { IsAdvanced = true }));
-            UIScaleModifier = Config.Bind("UI", "UI Scale Factor", Screen.height <= 1080 ? 1.3f : 1f,
-                new ConfigDescription("Additional Scale to apply to the UI",
+            UIScaleModifier = Config.Bind("UI", "Advanced UI Scale Factor", 1.3f,
+                new ConfigDescription("Additional Scale to apply to the Advanced UI",
                     new AcceptableValueRange<float>(0.5f, 2f)));
-            UIMainScaleFactor = Config.Bind("UI", "Main UI Scale Factor", Screen.height <= 1080 ? 1.3f : 1f,
+            UIMainScaleFactor = Config.Bind("UI", "Main UI Scale Factor", Screen.height > 1080 ? 1f : 0.8f,
                 new ConfigDescription("Scale factor applied to all standard IMGUI windows (Simple Mode, Bone Editor, etc.)",
                     new AcceptableValueRange<float>(0.5f, 2f)));
             UIDeleteNodeKey = Config.Bind("Keybinds", "Delete Node", KeyCode.Delete,
