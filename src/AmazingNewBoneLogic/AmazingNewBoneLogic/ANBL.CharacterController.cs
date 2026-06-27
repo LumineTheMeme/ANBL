@@ -1653,6 +1653,10 @@ namespace AmazingNewBoneLogic
         private Rect simpleWindowRect = new Rect(150, 150, simpleMinWidth, simpleMinHeight);
         private Vector2 simpleWindowScrollPosAcs = Vector2.zero;
         private Vector2 simpleWindowScrollPosGrp = Vector2.zero;
+        private Vector2 simpleWindowScrollPosAcsLayout = Vector2.zero;
+        private Vector2 simpleWindowScrollPosGrpLayout = Vector2.zero;
+        private float acsRectHeightLayout = 0f;
+        private float grpRectHeightLayout = 0f;
 
         private int? simpleAccBeingBound = null;
         private Rect simpleAccBindRect = new Rect();
@@ -1783,6 +1787,11 @@ namespace AmazingNewBoneLogic
                             GUI.Box(acsRect, "");
                             GUILayout.BeginArea(acsRect, "");
                             simpleWindowScrollPosAcs = GUILayout.BeginScrollView(simpleWindowScrollPosAcs, false, true);
+                            if (Event.current.type == EventType.Layout)
+                            {
+                                simpleWindowScrollPosAcsLayout = simpleWindowScrollPosAcs;
+                                acsRectHeightLayout = acsRect.height;
+                            }
                             {
                                 int coordVal = ChaControl.fileStatus.coordinateType;
                                 if (!boneEdits.TryGetValue(coordVal, out var editsList) || editsList == null)
@@ -1814,8 +1823,8 @@ namespace AmazingNewBoneLogic
                                         GUILayout.Space(2);
                                         float yStart = (numBtns - 1) * (boxSize.y + 2f);
                                         // Only draw visible buttons to save on some garbage
-                                        if (yStart + boxSize.y > simpleWindowScrollPosAcs.y &&
-                                            yStart < simpleWindowScrollPosAcs.y + acsRect.height)
+                                        if (yStart + boxSize.y > simpleWindowScrollPosAcsLayout.y &&
+                                            yStart < simpleWindowScrollPosAcsLayout.y + acsRectHeightLayout)
                                         {
                                             GUILayout.Box("", solidSkin.window,
                                                 new[]
@@ -1864,6 +1873,11 @@ namespace AmazingNewBoneLogic
                             GUI.Box(grpRect, "");
                             GUILayout.BeginArea(grpRect, "");
                             simpleWindowScrollPosGrp = GUILayout.BeginScrollView(simpleWindowScrollPosGrp, false, true);
+                            if (Event.current.type == EventType.Layout)
+                            {
+                                simpleWindowScrollPosGrpLayout = simpleWindowScrollPosGrp;
+                                grpRectHeightLayout = grpRect.height;
+                            }
                             {
                                 GUILayout.BeginHorizontal();
                                 {
@@ -1892,8 +1906,8 @@ namespace AmazingNewBoneLogic
                                         baseBoxHeight + numChildren * childHeight - 4f);
                                     float yStart = baseHeight + i * baseBoxHeight +
                                                    (sumChildren - numChildren) * childHeight;
-                                    if (yStart + grpBoxSize.y > simpleWindowScrollPosGrp.y &&
-                                        yStart < simpleWindowScrollPosGrp.y + grpRect.height)
+                                    if (yStart + grpBoxSize.y > simpleWindowScrollPosGrpLayout.y &&
+                                        yStart < simpleWindowScrollPosGrpLayout.y + grpRectHeightLayout)
                                     {
                                         GUILayout.Box("", solidSkin.window,
                                             new[] { GUILayout.Width(grpBoxSize.x), GUILayout.Height(grpBoxSize.y) });
