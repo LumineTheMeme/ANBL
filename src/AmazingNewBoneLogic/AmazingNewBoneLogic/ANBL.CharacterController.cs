@@ -668,19 +668,19 @@ namespace AmazingNewBoneLogic
         internal LogicFlowGraph createGraph(int? outfit = null)
         {
             if (!outfit.HasValue) outfit = ChaControl.fileStatus.coordinateType;
+
             if (graphs == null) graphs = new Dictionary<int, LogicFlowGraph>();
-
-            if (graphData == null) graphData = new Dictionary<LogicFlowGraph, GraphData>();
-            graphs[outfit.Value] = new LogicFlowGraph(new Rect(new Vector2(100, 10), defaultGraphSize));
-
+            if (!graphs.ContainsKey(outfit.Value))
+            {
+                if (graphData == null) graphData = new Dictionary<LogicFlowGraph, GraphData>();
+                graphs[outfit.Value] = new LogicFlowGraph(new Rect(new Vector2(750, 10), defaultGraphSize));
+                graphData.Add(graphs[outfit.Value], new GraphData(this, graphs[outfit.Value]));
+            }
             // set input keycodes
             graphs[outfit.Value].KeyNodeDelete = AmazingNewBoneLogic.UIDeleteNodeKey.Value;
             graphs[outfit.Value].KeyNodeDisable = AmazingNewBoneLogic.UIDisableNodeKey.Value;
             graphs[outfit.Value].KeySelectTree = AmazingNewBoneLogic.UISelectedTreeKey.Value;
             graphs[outfit.Value].KeySelectNetwork = AmazingNewBoneLogic.UISelectNetworkKey.Value;
-
-            // create simple mode data
-            graphData[graphs[outfit.Value]] = new GraphData(this, graphs[outfit.Value]);
 
             float topY = 900;
 
@@ -1347,13 +1347,55 @@ namespace AmazingNewBoneLogic
             GameCursor c = GameCursor.Instance;
             if (resetPostion)
             {
-                lfg.setPosition(new Vector2(100, 10));
+                lfg.setPosition(new Vector2(750, 10));
             }
             else
             {
                 simpleWindowRect.x = Mathf.Clamp(simpleWindowRect.x, 0, Mathf.Max(0, Screen.width - simpleWindowRect.width));
                 simpleWindowRect.y = Mathf.Clamp(simpleWindowRect.y, 0, Mathf.Max(0, Screen.height - simpleWindowRect.height));
             }
+
+            try
+            {
+                var analController = this.gameObject.GetComponent("AmazingNewAccessoryLogic.AnalCharaController");
+                if (analController != null)
+                {
+                    var analDisplayField = analController.GetType().GetField("displayGraph", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                    if (analDisplayField != null && (bool)analDisplayField.GetValue(analController))
+                    {
+                        var analLfgProp = analController.GetType().GetProperty("lfg", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                        if (analLfgProp != null)
+                        {
+                            var analLfg = analLfgProp.GetValue(analController, null) as LogicFlows.LogicFlowGraph;
+                            if (analLfg != null)
+                            {
+                                Vector2 analPos = analLfg.getPosition();
+                                Vector2 myPos = lfg.getPosition();
+                                if (Vector2.Distance(analPos, myPos) < 150f)
+                                {
+                                    float uiScale = lfg.getUIScale();
+                                    float baseScreenWidth = Screen.width / uiScale;
+                                    float baseScreenHeight = Screen.height / uiScale;
+                                    
+                                    float newX = analPos.x + 650f;
+                                    float newY = analPos.y;
+                                    
+                                    if (newX + 600f > baseScreenWidth)
+                                    {
+                                        newX = analPos.x - 650f;
+                                    }
+                                    
+                                    newX = Mathf.Clamp(newX, 0f, Mathf.Max(0f, baseScreenWidth - 600f));
+                                    newY = Mathf.Clamp(newY, 0f, Mathf.Max(0f, baseScreenHeight - 900f));
+                                    
+                                    lfg.setPosition(new Vector2(newX, newY));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
 
             if (c != null)
             {
@@ -1652,15 +1694,17 @@ namespace AmazingNewBoneLogic
         private Rect groupScrollRect = new Rect();
         private Vector2 groupScrollPos = Vector2.zero;
 
+        #region Simple GUI Data
         private const float simpleMinWidth = 720f;
         private const float simpleMinHeight = 480f;
-        private Rect simpleWindowRect = new Rect(150, 150, simpleMinWidth, simpleMinHeight);
+        private Rect simpleWindowRect = new Rect(250, 250, simpleMinWidth, simpleMinHeight);
         private Vector2 simpleWindowScrollPosAcs = Vector2.zero;
         private Vector2 simpleWindowScrollPosGrp = Vector2.zero;
         private Vector2 simpleWindowScrollPosAcsLayout = Vector2.zero;
         private Vector2 simpleWindowScrollPosGrpLayout = Vector2.zero;
         private float acsRectHeightLayout = 0f;
         private float grpRectHeightLayout = 0f;
+        #endregion
 
         private int? simpleAccBeingBound = null;
         private Rect simpleAccBindRect = new Rect();
@@ -2767,7 +2811,7 @@ namespace AmazingNewBoneLogic
         #region Advanced Input GUI
 
         private bool showAdvancedInputWindow = false;
-        private Rect advancedInputWindowRect = new Rect(25, 25, 360, 400);
+        private Rect advancedInputWindowRect = new Rect(425, 25, 360, 400);
 
         private Vector2 advanceInputWindowScroll = new Vector2();
 

@@ -181,4 +181,13 @@
   </PropertyGroup>
   <Import Project="..\packages\IllusionLibs.KoikatsuSunshine.UnityEngine.TextRenderingModule.2019.4.9\build\IllusionLibs.KoikatsuSunshine.UnityEngine.TextRenderingModule.targets" Condition="Exists('..\packages\IllusionLibs.KoikatsuSunshine.UnityEngine.TextRenderingModule.2019.4.9\build\IllusionLibs.KoikatsuSunshine.UnityEngine.TextRenderingModule.targets')" />
   <Import Project="..\packages\IllusionLibs.KoikatsuSunshine.Unity.TextMeshPro.2019.4.9\build\IllusionLibs.KoikatsuSunshine.Unity.TextMeshPro.targets" Condition="Exists('..\packages\IllusionLibs.KoikatsuSunshine.Unity.TextMeshPro.2019.4.9\build\IllusionLibs.KoikatsuSunshine.Unity.TextMeshPro.targets')" />
+  <Target Name="ZipRelease" AfterTargets="Build" Condition=" '$(Configuration)' == 'Release' ">
+    <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
+      <Output TaskParameter="Assemblies" ItemName="MyAssemblyIdentities"/>
+    </GetAssemblyIdentity>
+    <PropertyGroup>
+      <AssemblyVersion>%(MyAssemblyIdentities.Version)</AssemblyVersion>
+    </PropertyGroup>
+    <Exec Command="powershell -Command &quot;$v = '$(AssemblyVersion)'; if ($v.EndsWith('.0')) { $v = $v.Substring(0, $v.Length - 2) }; $v = $v.Replace('.', '_'); Compress-Archive -Path '$(TargetDir)$(AssemblyName).dll', '$(TargetDir)New.UnityLogicFlows.dll' -DestinationPath ('$(TargetDir)$(AssemblyName)_' + $v + '.zip') -Force&quot;" />
+  </Target>
 </Project>

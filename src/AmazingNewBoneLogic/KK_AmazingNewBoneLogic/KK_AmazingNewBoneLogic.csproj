@@ -120,4 +120,13 @@
   <Import Project="..\packages\IllusionLibs.Koikatu.UnityEngine.5.6.2.4\build\IllusionLibs.Koikatu.UnityEngine.targets" Condition="Exists('..\packages\IllusionLibs.Koikatu.UnityEngine.5.6.2.4\build\IllusionLibs.Koikatu.UnityEngine.targets')" />
   <Import Project="..\packages\IllusionLibs.Koikatu.UnityEngine.UI.5.6.2.4\build\IllusionLibs.Koikatu.UnityEngine.UI.targets" Condition="Exists('..\packages\IllusionLibs.Koikatu.UnityEngine.UI.5.6.2.4\build\IllusionLibs.Koikatu.UnityEngine.UI.targets')" />
   <Import Project="..\packages\IllusionLibs.Koikatu.TextMeshPro.2019.4.27.4\build\IllusionLibs.Koikatu.TextMeshPro.targets" Condition="Exists('..\packages\IllusionLibs.Koikatu.TextMeshPro.2019.4.27.4\build\IllusionLibs.Koikatu.TextMeshPro.targets')" />
+  <Target Name="ZipRelease" AfterTargets="Build" Condition=" '$(Configuration)' == 'Release' ">
+    <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
+      <Output TaskParameter="Assemblies" ItemName="MyAssemblyIdentities"/>
+    </GetAssemblyIdentity>
+    <PropertyGroup>
+      <AssemblyVersion>%(MyAssemblyIdentities.Version)</AssemblyVersion>
+    </PropertyGroup>
+    <Exec Command="powershell -Command &quot;$v = '$(AssemblyVersion)'; if ($v.EndsWith('.0')) { $v = $v.Substring(0, $v.Length - 2) }; $v = $v.Replace('.', '_'); Compress-Archive -Path '$(TargetDir)$(AssemblyName).dll', '$(TargetDir)Old.UnityLogicFlows.dll' -DestinationPath ('$(TargetDir)$(AssemblyName)_' + $v + '.zip') -Force&quot;" />
+  </Target>
 </Project>
