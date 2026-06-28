@@ -18,16 +18,16 @@ namespace AmazingNewBoneLogic
 {
     public class AnblCharaController : CharaCustomFunctionController
     {
-        public const int normalInputWindowID = 2233500;
-        public const int advancedInputWindowID = 2233511;
-        public const int renameWindowID = 2233522;
-        public const int groupSelectWindowID = 2233533;
-        public const int simpleModeWindowID = 2233544;
-        public const int simpleModeAccBindDropID = 2233555;
-        public const int simpleModeGroupAddID = 2233566;
-        public const int confirmWindowID = 2233577;
-        public const int boneEditorWindowID = 2233588;
-        public const int transferPopupID = 2233599;
+        public const int normalInputWindowID = 2234500;
+        public const int advancedInputWindowID = 2234511;
+        public const int renameWindowID = 2234522;
+        public const int groupSelectWindowID = 2234533;
+        public const int simpleModeWindowID = 2234544;
+        public const int simpleModeAccBindDropID = 2234555;
+        public const int simpleModeGroupAddID = 2234566;
+        public const int confirmWindowID = 2234577;
+        public const int boneEditorWindowID = 2234588;
+        public const int transferPopupID = 2234599;
 
         public static readonly Vector2 defaultGraphSize = new Vector2(600, 900);
         public static readonly byte saveVersion = 2;
