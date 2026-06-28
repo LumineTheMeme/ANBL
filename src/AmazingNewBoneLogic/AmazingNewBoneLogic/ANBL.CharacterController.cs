@@ -1365,7 +1365,11 @@ namespace AmazingNewBoneLogic
         {
             displayGraph = false;
             displayBoneEditor = false;
-            UpdateHighlight(null);
+            if (lastHoveredBoneTransform != null)
+            {
+                UpdateHighlight(null);
+                lastHoveredBoneTransform = null;
+            }
             if (MakerAPI.InsideAndLoaded) AmazingNewBoneLogic.SidebarToggle.Value = false;
             AnblCameraComponent acc = rCam.GetComponent<AnblCameraComponent>();
             if (acc != null) acc.OnPostRenderEvent -= postRenderEvent;
@@ -3528,8 +3532,15 @@ namespace AmazingNewBoneLogic
                 StopAllCoroutines();
                 StartCoroutine(KKAPI.Utilities.CoroutineUtils.CreateCoroutine(new WaitForFixedUpdate(), () =>
                 {
-                    var hoveredBones = bone != null ? bone.GetComponentsInChildren<Transform>() : null;
-                    _highlightBonesMethod.Invoke(null, new object[] { hoveredBones });
+                    try
+                    {
+                        var hoveredBones = bone != null ? bone.GetComponentsInChildren<Transform>() : null;
+                        _highlightBonesMethod.Invoke(null, new object[] { hoveredBones });
+                    }
+                    catch (Exception)
+                    {
+                        // Ignore exceptions from external plugin to prevent error spam
+                    }
                 }));
             }
         }
