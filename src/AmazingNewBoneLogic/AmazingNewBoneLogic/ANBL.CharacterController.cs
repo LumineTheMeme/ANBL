@@ -4070,6 +4070,11 @@ namespace AmazingNewBoneLogic
                         edit.Name = node.label;
                     }
                 }
+                
+                if (node.inputAt(0) == null)
+                {
+                    setAccessoryState(graphKey, false);
+                }
             }
 
             // 2. Ensure unique names among bone edits
