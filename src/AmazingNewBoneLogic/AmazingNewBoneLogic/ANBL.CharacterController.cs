@@ -1228,6 +1228,15 @@ namespace AmazingNewBoneLogic
         {
             if (!outfit.HasValue) outfit = ChaControl.fileStatus.coordinateType;
 
+            if (name == null && boneEdits.TryGetValue(outfit.Value, out var editsList) && editsList != null)
+            {
+                var edit = editsList.FirstOrDefault(e => e.GraphKey == slot);
+                if (edit != null)
+                {
+                    name = edit.Name;
+                }
+            }
+
             if (graphs.ContainsKey(outfit.Value))
             {
                 int idxSlot = 1000000 + slot;
@@ -2345,7 +2354,7 @@ namespace AmazingNewBoneLogic
                             {
                                 if (lfg.getNodeAt(1000000 + edit.GraphKey) == null)
                                 {
-                                    addOutput(edit.GraphKey, coord, edit.Name);
+                                    addOutput(edit.GraphKey, coord, edit.Name ?? "Output");
                                 }
                             }
                         }
