@@ -433,6 +433,7 @@ namespace AmazingNewBoneLogic
                     if (node != null)
                     {
                         node.inputs[0] = null;
+                        ctrl.setAccessoryState(kvp.Key - 1000000, false);
                     }
 
                     continue;

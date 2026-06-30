@@ -1252,7 +1252,10 @@ namespace AmazingNewBoneLogic
                     graph.setSize(new Vector2(output.getPosition().x + 80f, graph.getSize().y));
 
                 output.nodeDeletedEvent += (object sender, NodeDeletedEventArgs e) =>
+                {
                     AmazingNewBoneLogic.Logger.LogInfo($"Removed Slot {slot} on outfit {outfit.Value}");
+                    setAccessoryState(slot, false);
+                };
                 return output;
             }
 
@@ -3264,6 +3267,7 @@ namespace AmazingNewBoneLogic
                      {
                          foreach (var edit in list)
                          {
+                             if (graphData.ContainsKey(lfg)) graphData[lfg].PurgeNode(lfg.getNodeAt(1000000 + edit.GraphKey));
                              lfg.RemoveNode(1000000 + edit.GraphKey);
                              activeBoneEditIds.Remove(edit.Id);
                          }
@@ -3340,6 +3344,7 @@ namespace AmazingNewBoneLogic
                             {
                                 list.RemoveAt(i);
                                 activeBoneEditIds.Remove(edit.Id);
+                                if (graphData.ContainsKey(lfg)) graphData[lfg].PurgeNode(lfg.getNodeAt(1000000 + edit.GraphKey));
                                 lfg.RemoveNode(1000000 + edit.GraphKey);
                                 if (selectedBoneEdit == edit) selectedBoneEdit = null;
                                 i--;
